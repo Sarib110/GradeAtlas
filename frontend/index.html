@@ -305,6 +305,7 @@ select.input-field{cursor:pointer;}
               <button id="mode-relative" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);">🎯 Relative Mode</button>
             </div>
             <p id="abs-mode-helper" class="abs-mode-helper">Enter exact marks for each component — weights must total 100%.</p>
+            <p id="rel-mode-helper" class="rel-mode-helper">Enter your marks + class averages for curve-based grading. Your score relative to class average affects final GPA.</p>
           </div>
         </div>
 
@@ -355,8 +356,8 @@ select.input-field{cursor:pointer;}
             </div>
           </div>
 
-          <!-- ABSOLUTE MODE COMPONENTS -->
-          <div id="absolute-panel" style="margin-top:12px;display:none;">
+          <!-- COMPONENTS PANEL (visible in both modes) -->
+          <div id="components-panel" style="margin-top:12px;display:none;">
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
               <strong style="color:var(--text2);">Components (weights must sum to 100%)</strong>
               <div id="weights-status" style="margin-left:8px;color:var(--text2);"></div>
@@ -370,6 +371,8 @@ select.input-field{cursor:pointer;}
                 <input type="number" id="comp-mid-obt" class="input-field" placeholder="e.g. 35" min="0">
                 <label class="form-label">Total</label>
                 <input type="number" id="comp-mid-total" class="input-field" min="1" value="50">
+                <label class="form-label rel-only-field">Class Avg %</label>
+                <input type="number" id="comp-mid-classavg" class="input-field rel-only-field" placeholder="e.g. 65" min="0" max="100">
               </div>
               <div style="background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);">
                 <div style="font-weight:700;color:#93c5fd;margin-bottom:10px;">📋 ASSIGNMENTS</div>
@@ -378,6 +381,8 @@ select.input-field{cursor:pointer;}
                 <label class="form-label">How many assignments?</label>
                 <input type="number" id="comp-assn-count" class="input-field" min="1" max="10" value="1">
                 <div id="assignments-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+                <label class="form-label rel-only-field">Class Avg %</label>
+                <input type="number" id="comp-assn-classavg" class="input-field rel-only-field" placeholder="e.g. 70" min="0" max="100">
               </div>
               <div style="background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);">
                 <div style="font-weight:700;color:#fbbf24;margin-bottom:10px;">📊 QUIZZES</div>
@@ -386,6 +391,8 @@ select.input-field{cursor:pointer;}
                 <label class="form-label">How many quizzes?</label>
                 <input type="number" id="comp-quiz-count" class="input-field" min="1" max="10" value="1">
                 <div id="quizzes-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+                <label class="form-label rel-only-field">Class Avg %</label>
+                <input type="number" id="comp-quiz-classavg" class="input-field rel-only-field" placeholder="e.g. 68" min="0" max="100">
               </div>
               <div id="project-panel" style="display:none;background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);">
                 <div style="font-weight:700;color:#4ade80;margin-bottom:10px;">🎯 PROJECTS</div>
@@ -394,6 +401,8 @@ select.input-field{cursor:pointer;}
                 <label class="form-label">How many projects?</label>
                 <input type="number" id="comp-project-count" class="input-field" min="1" max="5" value="1">
                 <div id="projects-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+                <label class="form-label rel-only-field">Class Avg %</label>
+                <input type="number" id="comp-project-classavg" class="input-field rel-only-field" placeholder="e.g. 72" min="0" max="100">
               </div>
               <div id="final-block" style="background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);transition:all 0.28s ease;">
                 <div style="font-weight:700;color:#f87171;margin-bottom:10px;">🏆 FINAL EXAM</div>
@@ -403,6 +412,8 @@ select.input-field{cursor:pointer;}
                 <input type="number" id="comp-final-obt" class="input-field" placeholder="e.g. 35" min="0">
                 <label class="form-label">Total</label>
                 <input type="number" id="comp-final-total" class="input-field" min="1" value="100">
+                <label class="form-label rel-only-field">Class Avg %</label>
+                <input type="number" id="comp-final-classavg" class="input-field rel-only-field" placeholder="e.g. 60" min="0" max="100">
               </div>
             </div>
             <div class="abs-preview-block" style="margin-top:12px;">
@@ -487,6 +498,8 @@ select.input-field{cursor:pointer;}
           #mode-relative.mode-active{background:#6c63ff;color:#ffffff;border:1px solid #6c63ff;box-shadow:0 6px 20px rgba(108,99,255,0.18);}
           .abs-mode-helper{font-size:12px;color:var(--text2);margin:0;text-align:right;max-width:340px;line-height:1.4;display:none;}
           .abs-mode-helper.show{display:block;}
+          .rel-mode-helper{font-size:12px;color:var(--text2);margin:0;text-align:right;max-width:420px;line-height:1.4;display:none;}
+          .rel-mode-helper.show{display:block;}
           .abs-gpa-display{font-weight:700;padding:2px 8px;border-radius:8px;}
           .abs-gpa-low{color:var(--red);background:rgba(239,68,68,0.12);}
           .abs-gpa-mid{color:var(--amber);background:rgba(245,158,11,0.12);}
@@ -522,7 +535,7 @@ select.input-field{cursor:pointer;}
             var STAGE_KEY = 'subject_stage';
             var absBtn = document.getElementById('mode-absolute');
             var relBtn = document.getElementById('mode-relative');
-            var absPanel = document.getElementById('absolute-panel');
+            var componentsPanel = document.getElementById('components-panel');
             var relPanel = document.getElementById('relative-panel');
             var weightsStatus = document.getElementById('weights-status');
             var stageMid = document.getElementById('stage-mid');
@@ -531,6 +544,7 @@ select.input-field{cursor:pointer;}
             var finalBlock = document.getElementById('final-block');
             var stageMsg = document.getElementById('stage-msg');
             var absModeHelper = document.getElementById('abs-mode-helper');
+            var relModeHelper = document.getElementById('rel-mode-helper');
             var absTargetSlider = document.getElementById('abs-target-slider');
             var absTargetGpaInput = document.getElementById('abs-target-gpa');
             var absGpaHint = document.getElementById('abs-gpa-hint');
@@ -587,7 +601,25 @@ select.input-field{cursor:pointer;}
               }
             }
 
-            function setMode(m){ localStorage.setItem(MODE_KEY, m); if(m==='absolute'){ absBtn.classList.add('mode-active'); relBtn.classList.remove('mode-active'); absPanel.style.display=''; relPanel.style.display='none'; if(absModeHelper) absModeHelper.classList.add('show'); } else { relBtn.classList.add('mode-active'); absBtn.classList.remove('mode-active'); absPanel.style.display='none'; relPanel.style.display=''; if(absModeHelper) absModeHelper.classList.remove('show'); } }
+            function setMode(m){
+              localStorage.setItem(MODE_KEY, m);
+              var relFields = document.querySelectorAll('.rel-only-field');
+              if(m==='absolute'){
+                absBtn.classList.add('mode-active'); relBtn.classList.remove('mode-active');
+                if(componentsPanel) componentsPanel.style.display='';
+                if(relPanel) relPanel.style.display='none';
+                if(absModeHelper) absModeHelper.classList.add('show');
+                if(relModeHelper) relModeHelper.classList.remove('show');
+                relFields.forEach(function(el){ el.style.display='none'; });
+              } else {
+                relBtn.classList.add('mode-active'); absBtn.classList.remove('mode-active');
+                if(componentsPanel) componentsPanel.style.display='';
+                if(relPanel) relPanel.style.display='';
+                if(absModeHelper) absModeHelper.classList.remove('show');
+                if(relModeHelper) relModeHelper.classList.add('show');
+                relFields.forEach(function(el){ el.style.display=''; });
+              }
+            }
             absBtn.addEventListener('click', function(){ setMode('absolute'); }); relBtn.addEventListener('click', function(){ setMode('relative'); }); var saved = localStorage.getItem(MODE_KEY) || 'absolute'; setMode(saved);
 
             if (absTargetSlider) absTargetSlider.addEventListener('input', function(){ if(absTargetGpaInput) absTargetGpaInput.value = absTargetSlider.value; updateAbsTargetUi(); });
@@ -1500,7 +1532,136 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
       }
     }
   } else if (mode === 'relative') {
-    gpa = safeFloat((document.getElementById('rel-gpa-number') || { value: '' }).value, null);
+    // Relative mode: use same component structure but calculate with class averages
+    var wMid = safeFloat((document.getElementById('comp-mid-weight')||{value:0}).value, 0);
+    var wAss = safeFloat((document.getElementById('comp-assn-weight')||{value:0}).value, 0);
+    var wQuiz = safeFloat((document.getElementById('comp-quiz-weight')||{value:0}).value, 0);
+    var wProject = safeFloat((document.getElementById('comp-project-weight')||{value:0}).value, 0);
+    var wFin = safeFloat((document.getElementById('comp-final-weight')||{value:0}).value, 0);
+    var sum = wMid + wAss + wQuiz + wProject + wFin;
+    
+    // If weights provided, validate them
+    if (sum > 0 && sum !== 100) { 
+      showPopup('⚠️', 'Weights Invalid', 'Component weights must sum to 100%. Current sum: ' + sum + '%'); 
+      return; 
+    }
+    
+    function collectRowItems(listEl, obtClass, totClass, nameClass) {
+      if (!listEl) return [];
+      var items = [];
+      var rows = listEl.querySelectorAll('.' + obtClass);
+      for (var i = 0; i < rows.length; i++) {
+        var obtEl = rows[i];
+        var parent = obtEl.closest('div').parentElement;
+        var totEl = parent.querySelector('.' + totClass);
+        var nameEl = nameClass ? parent.querySelector('.' + nameClass) : null;
+        var obt = obtEl.value.trim() === '' ? null : safeFloat(obtEl.value, null);
+        var tot = totEl ? safeFloat(totEl.value, 10) : 10;
+        var name = nameEl ? nameEl.value.trim() : '';
+        items.push({ obt: obt, tot: tot, name: name || ('Item ' + (i+1)) });
+      }
+      return items;
+    }
+    
+    function calcAvgFromItems(items) {
+      if (!items || !items.length) return null;
+      var totalPct = 0; var count = 0;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].obt !== null && items[i].tot > 0) {
+          totalPct += (items[i].obt / items[i].tot) * 100;
+          count++;
+        }
+      }
+      return count > 0 ? totalPct / count : null;
+    }
+    
+    var assignmentsList = document.getElementById('assignments-list');
+    var quizzesList = document.getElementById('quizzes-list');
+    var projectsList = document.getElementById('projects-list');
+    
+    var assItems = collectRowItems(assignmentsList, 'assignment-obt', 'assignment-total');
+    var quizItems = collectRowItems(quizzesList, 'quiz-obt', 'quiz-total');
+    var projItems = collectRowItems(projectsList, 'project-obt', 'project-total', 'project-name');
+    
+    // Collect class averages
+    var midClassAvg = safeFloat((document.getElementById('comp-mid-classavg')||{value:''}).value, null);
+    var assClassAvg = safeFloat((document.getElementById('comp-assn-classavg')||{value:''}).value, null);
+    var quizClassAvg = safeFloat((document.getElementById('comp-quiz-classavg')||{value:''}).value, null);
+    var projClassAvg = safeFloat((document.getElementById('comp-project-classavg')||{value:''}).value, null);
+    var finClassAvg = safeFloat((document.getElementById('comp-final-classavg')||{value:''}).value, null);
+    
+    components = {
+      midterm: { 
+        weight: wMid, 
+        obtained: (document.getElementById('comp-mid-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-mid-obt').value, null), 
+        total: safeFloat((document.getElementById('comp-mid-total')||{value:100}).value,100),
+        classAvg: midClassAvg
+      },
+      assignment: { 
+        weight: wAss, 
+        obtained: calcAvgFromItems(assItems), 
+        total: 100, 
+        items: assItems,
+        classAvg: assClassAvg
+      },
+      quiz: { 
+        weight: wQuiz, 
+        obtained: calcAvgFromItems(quizItems), 
+        total: 100, 
+        items: quizItems,
+        classAvg: quizClassAvg
+      },
+      project: { 
+        weight: wProject, 
+        obtained: calcAvgFromItems(projItems), 
+        total: 100, 
+        items: projItems,
+        classAvg: projClassAvg
+      },
+      final: { 
+        weight: wFin, 
+        obtained: (document.getElementById('comp-final-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-final-obt').value, null), 
+        total: safeFloat((document.getElementById('comp-final-total')||{value:100}).value,100), 
+        hidden: (stage==='mid-semester'),
+        classAvg: finClassAvg
+      }
+    };
+    
+    // Calculate GPA using relative grading (student score relative to class average)
+    function calcRelativeComponentPct(c) {
+      if (!c || c.obtained === null || c.obtained === undefined) return null;
+      var studentPct = (c.obtained / (c.total || 100)) * 100;
+      
+      // If no class average, use student score directly
+      if (c.classAvg === null || c.classAvg === undefined || c.classAvg === 0) {
+        return studentPct;
+      }
+      
+      // Relative formula: (StudentScore / ClassAvg) * 100, capped at 100
+      var relativePct = (studentPct / c.classAvg) * 100;
+      return Math.min(relativePct, 100); // Cap at 100%
+    }
+    
+    var weightedRelative = 0;
+    var hasAny = false;
+    ['midterm', 'assignment', 'quiz', 'project', 'final'].forEach(function(key) {
+      var c = components[key];
+      if (!c) return;
+      var pct = calcRelativeComponentPct(c);
+      if (pct !== null) {
+        weightedRelative += pct * ((c.weight || 0) / 100);
+        hasAny = true;
+      }
+    });
+    
+    if (hasAny) {
+      marks = weightedRelative;
+      total = 100;
+      gpa = pctToGPA(weightedRelative, system);
+    } else {
+      // Fallback to manual slider if no components
+      gpa = safeFloat((document.getElementById('rel-gpa-number') || { value: '' }).value, null);
+    }
   }
 
   if (editingSubjectId !== null) {
