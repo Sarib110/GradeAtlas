@@ -477,6 +477,19 @@ select.input-field{cursor:pointer;}
             </div>
           </div>
 
+          <!-- CHAPTER TRACKING (optional) -->
+          <div class="chapter-section" style="margin-top:14px;">
+            <label class="chapter-toggle"><input type="checkbox" id="track-chapters"> 📖 Track chapters for this subject (optional)</label>
+            <div id="chapters-panel" class="chapters-panel" style="display:none;">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+                <input type="text" id="chapter-name-input" class="input-field" placeholder="e.g. Chapter 3 - Integration" style="flex:1;min-width:180px;">
+                <button type="button" class="btn btn-sm btn-primary" id="add-chapter-btn">+ Add</button>
+              </div>
+              <div id="chapters-list" class="chapters-list"></div>
+              <div id="chapters-progress-text" class="chapters-progress-text"></div>
+            </div>
+          </div>
+
           <div style="display:flex;gap:10px;margin-top:12px;align-items:center;">
             <button id="add-subject-btn" class="btn btn-primary">+ Add Subject</button>
             <button id="cancel-edit-btn" class="btn btn-ghost">Cancel</button>
@@ -545,6 +558,17 @@ select.input-field{cursor:pointer;}
           .pulse-warning{animation:pulse 1.2s ease-in-out infinite;}
           @keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.02);opacity:.8;}}
           @media(max-width:600px){ .mini-bars{flex-direction:column;gap:6px;} }
+          .chapter-toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);cursor:pointer;user-select:none;}
+          .chapter-toggle input{cursor:pointer;}
+          .chapters-panel{margin-top:10px;padding:12px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;}
+          .chapters-list{display:flex;flex-direction:column;gap:6px;}
+          .chapter-item{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;}
+          .chapter-item.done{opacity:0.75;}
+          .chapter-item label{flex:1;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+          .chapter-item.done label{text-decoration:line-through;color:var(--text2);}
+          .chapters-progress-text{font-size:12px;color:var(--text2);margin-top:8px;}
+          .chapter-bar{flex:1;height:6px;background:var(--bg3);border-radius:999px;overflow:hidden;margin-top:6px;}
+          .chapter-bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--green));transition:width 0.4s ease;}
         </style>
         <script>
           (function(){
@@ -836,6 +860,7 @@ select.input-field{cursor:pointer;}
 
             window.populateSubjectFormFromRecord = function(s) {
               if (!s) return;
+              if (typeof loadFormChaptersFromSubject === 'function') loadFormChaptersFromSubject(s);
               setMode(s.mode === 'relative' ? 'relative' : 'absolute');
               if (s.stage) setStage(s.stage);
               
@@ -929,6 +954,7 @@ select.input-field{cursor:pointer;}
                     '<div style="flex:1"><div style="font-size:12px;color:var(--text2);">🏆 Final • '+finLabel+'</div><div class="mini-bar"><div class="mini-fill" style="width:'+(finPct!==null?Math.min(100,finPct).toFixed(1):0)+'%"></div></div></div>'+
                   '</div>'+
                   '<div class="ach-badges">'+badgesHtml+'</div>'+
+                  (typeof renderChapterProgressHtml === 'function' ? renderChapterProgressHtml(s.chapters) : '') +
                   '<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-ghost btn-sm edit-sub">✏️ Edit</button><button class="btn btn-danger btn-sm del-sub">🗑️ Delete</button></div>';
 
                 // border color per stage
@@ -1100,6 +1126,95 @@ var studyActivity = {};
 var countdownTimer = null;
 var editingSubjectId = null;
 var editingTTId = null;
+var formChapters = [];
+
+function getChapterProgress(chapters) {
+  if (!chapters || !chapters.length) return null;
+  var done = chapters.filter(function(c) { return c && c.done; }).length;
+  return { done: done, total: chapters.length, pct: Math.round((done / chapters.length) * 100) };
+}
+
+function renderChaptersList() {
+  var list = document.getElementById('chapters-list');
+  var progressText = document.getElementById('chapters-progress-text');
+  if (!list) return;
+  list.innerHTML = '';
+  var doneCount = 0;
+  formChapters.forEach(function(ch, i) {
+    if (!ch) return;
+    if (ch.done) doneCount++;
+    var row = document.createElement('div');
+    row.className = 'chapter-item' + (ch.done ? ' done' : '');
+    var label = document.createElement('label');
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!ch.done;
+    cb.addEventListener('change', function() {
+      formChapters[i].done = cb.checked;
+      renderChaptersList();
+    });
+    var span = document.createElement('span');
+    span.textContent = ch.name;
+    label.appendChild(cb);
+    label.appendChild(span);
+    var delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'btn btn-sm btn-danger';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', function() {
+      formChapters.splice(i, 1);
+      renderChaptersList();
+    });
+    row.appendChild(label);
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+  if (progressText) {
+    if (formChapters.length) {
+      progressText.textContent = doneCount + ' / ' + formChapters.length + ' chapters complete (' + Math.round((doneCount / formChapters.length) * 100) + '%)';
+    } else {
+      progressText.textContent = 'No chapters added yet.';
+    }
+  }
+}
+
+function resetFormChapters() {
+  formChapters = [];
+  var trackCb = document.getElementById('track-chapters');
+  var panel = document.getElementById('chapters-panel');
+  var nameInput = document.getElementById('chapter-name-input');
+  if (trackCb) trackCb.checked = false;
+  if (panel) panel.style.display = 'none';
+  if (nameInput) nameInput.value = '';
+  renderChaptersList();
+}
+
+function loadFormChaptersFromSubject(s) {
+  var trackCb = document.getElementById('track-chapters');
+  var panel = document.getElementById('chapters-panel');
+  formChapters = (s && s.chapters && s.chapters.length)
+    ? s.chapters.map(function(c) { return { name: c.name, done: !!c.done }; })
+    : [];
+  var tracking = formChapters.length > 0;
+  if (trackCb) trackCb.checked = tracking;
+  if (panel) panel.style.display = tracking ? '' : 'none';
+  renderChaptersList();
+}
+
+function collectFormChapters() {
+  var trackCb = document.getElementById('track-chapters');
+  if (!trackCb || !trackCb.checked) return [];
+  return formChapters.map(function(c) { return { name: c.name, done: !!c.done }; });
+}
+
+function renderChapterProgressHtml(chapters) {
+  var prog = getChapterProgress(chapters);
+  if (!prog) return '';
+  return '<div style="margin-top:8px;">' +
+    '<div style="font-size:12px;color:var(--text2);">📖 Chapters: ' + prog.done + '/' + prog.total + ' (' + prog.pct + '%)</div>' +
+    '<div class="chapter-bar"><div class="chapter-bar-fill" style="width:' + prog.pct + '%"></div></div>' +
+  '</div>';
+}
 
 // ============================================================
 // UTILITIES
@@ -1703,9 +1818,39 @@ function cancelEditSubject() {
   if (totalEl) totalEl.value = '100';
   document.getElementById('subject-credits').value = '3';
   document.getElementById('subject-system').value = 'pakistan';
+  resetFormChapters();
 }
 
 document.getElementById('cancel-edit-btn').addEventListener('click', cancelEditSubject);
+
+var trackChaptersCb = document.getElementById('track-chapters');
+if (trackChaptersCb) {
+  trackChaptersCb.addEventListener('change', function() {
+    var panel = document.getElementById('chapters-panel');
+    if (panel) panel.style.display = trackChaptersCb.checked ? '' : 'none';
+    renderChaptersList();
+  });
+}
+var addChapterBtn = document.getElementById('add-chapter-btn');
+if (addChapterBtn) {
+  addChapterBtn.addEventListener('click', function() {
+    var input = document.getElementById('chapter-name-input');
+    var name = input ? input.value.trim() : '';
+    if (!name) { showToast('Enter a chapter name', 'warning'); return; }
+    formChapters.push({ name: name, done: false });
+    if (input) input.value = '';
+    if (trackChaptersCb) trackChaptersCb.checked = true;
+    var panel = document.getElementById('chapters-panel');
+    if (panel) panel.style.display = '';
+    renderChaptersList();
+  });
+}
+var chapterNameInput = document.getElementById('chapter-name-input');
+if (chapterNameInput) {
+  chapterNameInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); if (addChapterBtn) addChapterBtn.click(); }
+  });
+}
 
 document.getElementById('add-subject-btn').addEventListener('click', function() {
   var name = document.getElementById('subject-name').value.trim();
@@ -1943,10 +2088,12 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
     }
   }
 
+  var chapters = collectFormChapters();
+
   if (editingSubjectId !== null) {
     var idx = subjects.findIndex(function(x) { return x.id === editingSubjectId; });
     if (idx !== -1) {
-      subjects[idx] = { id: editingSubjectId, name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage, gpa: gpa };
+      subjects[idx] = { id: editingSubjectId, name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage, gpa: gpa, chapters: chapters };
     }
     cancelEditSubject();
     showToast('Subject updated!', 'success');
@@ -1954,7 +2101,7 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
     if (typeof saveUserData === 'function') saveUserData(); else saveData();
     renderSubjects(); renderOverview();
   } else {
-    var newSub = { id: generateId(), name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage, gpa: gpa };
+    var newSub = { id: generateId(), name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage, gpa: gpa, chapters: chapters };
     subjects.push(newSub);
     // persist
     if (typeof saveUserData === 'function') saveUserData(); else saveData();
@@ -1971,6 +2118,7 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
     var compIds = ['comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total'];
     compIds.forEach(function(id){ var el = document.getElementById(id); if(el) { if(id.indexOf('weight')!==-1) { /* keep defaults */ } else if(id.indexOf('total')!==-1) { el.value = '100'; } else el.value = ''; } });
     if (document.getElementById('rel-gpa-slider')) document.getElementById('rel-gpa-slider').value = 3; if (document.getElementById('rel-gpa-number')) document.getElementById('rel-gpa-number').value = 3.0;
+    resetFormChapters();
   }
 });
 
@@ -1978,10 +2126,10 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
 var importBtn = document.getElementById('import-subjects-btn'); if(importBtn){
   var importInput = document.createElement('input'); importInput.type='file'; importInput.accept='.json,application/json'; importInput.style.display='none'; document.body.appendChild(importInput);
   importBtn.addEventListener('click', function(){ importInput.click(); });
-  importInput.addEventListener('change', function(e){ var f = e.target.files && e.target.files[0]; if(!f) return; var reader = new FileReader(); reader.onload = function(ev){ try{ var data = JSON.parse(ev.target.result); if(Array.isArray(data)){ var added=0; data.forEach(function(it){ try{ if(!it || !it.name) return; var obj = { id: it.id||generateId(), name: it.name, marks: (it.marks===undefined?null:it.marks), total: safeFloat(it.total,100), credits: safeFloat(it.credits,3), system: it.system||'pakistan', mode: it.mode||localStorage.getItem('subject_mode')||'absolute', components: it.components||{}, stage: it.stage||localStorage.getItem('subject_stage')||'mid-semester' }; subjects.push(obj); added++; }catch(e){} }); if(added>0){ if(typeof saveUserData === 'function') saveUserData(); else saveData(); renderSubjects(); renderOverview(); showToast('Imported!','success'); } else { showToast('No valid subjects in file','warning'); } } else { showPopup('❌','Invalid File','JSON must be an array of subjects.'); } }catch(err){ showPopup('❌','Import Failed','Could not parse JSON file.'); } finally{ importInput.value=''; } }; reader.readAsText(f); }); }
+  importInput.addEventListener('change', function(e){ var f = e.target.files && e.target.files[0]; if(!f) return; var reader = new FileReader(); reader.onload = function(ev){ try{ var data = JSON.parse(ev.target.result); if(Array.isArray(data)){ var added=0; data.forEach(function(it){ try{ if(!it || !it.name) return; var obj = { id: it.id||generateId(), name: it.name, marks: (it.marks===undefined?null:it.marks), total: safeFloat(it.total,100), credits: safeFloat(it.credits,3), system: it.system||'pakistan', mode: it.mode||localStorage.getItem('subject_mode')||'absolute', components: it.components||{}, stage: it.stage||localStorage.getItem('subject_stage')||'mid-semester', gpa: it.gpa, chapters: Array.isArray(it.chapters) ? it.chapters : [] }; subjects.push(obj); added++; }catch(e){} }); if(added>0){ if(typeof saveUserData === 'function') saveUserData(); else saveData(); renderSubjects(); renderOverview(); showToast('Imported!','success'); } else { showToast('No valid subjects in file','warning'); } } else { showPopup('❌','Invalid File','JSON must be an array of subjects.'); } }catch(err){ showPopup('❌','Import Failed','Could not parse JSON file.'); } finally{ importInput.value=''; } }; reader.readAsText(f); }); }
 
 // CLEAR PANEL button: confirm then clear form inputs only
-var clearBtn = document.getElementById('clear-panel-btn'); if(clearBtn){ clearBtn.addEventListener('click', function(){ showPopup('⚠️','Clear Form','Clear all form fields in the Subjects panel?', function(){ var ids = ['subject-name','subject-marks','subject-total','subject-credits','subject-system','comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total','rel-gpa-slider','rel-gpa-number']; ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; if(el.type==='range') el.value = 3; else if(el.type==='number' && id.indexOf('total')!==-1) el.value = '100'; else if(id==='subject-credits') el.value='3'; else if(id==='subject-system') el.value='pakistan'; else el.value=''; }); if(document.getElementById('weights-status')) document.getElementById('weights-status').textContent=''; if(document.getElementById('abs-preview-pct')) document.getElementById('abs-preview-pct').textContent='—'; if(document.getElementById('abs-preview-gpa')) document.getElementById('abs-preview-gpa').textContent='—'; showToast('Form cleared!','info'); }); }); }
+var clearBtn = document.getElementById('clear-panel-btn'); if(clearBtn){ clearBtn.addEventListener('click', function(){ showPopup('⚠️','Clear Form','Clear all form fields in the Subjects panel?', function(){ var ids = ['subject-name','subject-marks','subject-total','subject-credits','subject-system','comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total','rel-gpa-slider','rel-gpa-number']; ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; if(el.type==='range') el.value = 3; else if(el.type==='number' && id.indexOf('total')!==-1) el.value = '100'; else if(id==='subject-credits') el.value='3'; else if(id==='subject-system') el.value='pakistan'; else el.value=''; }); if(document.getElementById('weights-status')) document.getElementById('weights-status').textContent=''; if(document.getElementById('abs-preview-pct')) document.getElementById('abs-preview-pct').textContent='—'; if(document.getElementById('abs-preview-gpa')) document.getElementById('abs-preview-gpa').textContent='—'; resetFormChapters(); showToast('Form cleared!','info'); }); }); }
 
 // ============================================================
 // RENDER TIMETABLE
