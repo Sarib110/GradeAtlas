@@ -101,8 +101,38 @@ select.input-field{cursor:pointer;}
 .subject-card-actions{display:flex;gap:8px;}
 .chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px;}
 .chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.chart-card.full-width{grid-column:1/-1;}
 .chart-card h3{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.8px;}
 .chart-card canvas{max-height:220px;}
+.chart-legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--text2);}
+.chart-legend .leg-low{color:#ef4444;}
+.chart-legend .leg-mid{color:#f59e0b;}
+.chart-legend .leg-high{color:#22c55e;}
+.progress-rings-grid{display:flex;flex-wrap:wrap;gap:16px;justify-content:flex-start;}
+.progress-ring-item{text-align:center;min-width:80px;}
+.progress-ring{width:72px;height:72px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;background:conic-gradient(var(--ring-color) calc(var(--pct) * 1%), var(--bg3) 0);}
+.progress-ring-inner{width:54px;height:54px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text);}
+.progress-ring-label{font-size:12px;color:var(--text2);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.heatmap-wrap{overflow-x:auto;}
+.heatmap-wrap{max-width:100%;position:relative;overflow:hidden;}
+.heatmap-header{font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;}
+.heatmap-header small{font-weight:400;color:var(--text3);font-size:12px;margin-left:8px;}
+.heatmap-main{display:flex;gap:8px;overflow:hidden;}
+.heatmap-days{display:flex;flex-direction:column;gap:3px;justify-content:space-around;font-size:10px;color:var(--text3);padding-top:20px;flex-shrink:0;}
+.heatmap-content{flex:1;position:relative;overflow:hidden;min-width:0;}
+.heatmap-months{display:flex;justify-content:space-between;margin-bottom:6px;font-size:10px;color:var(--text3);padding-left:2px;}
+.heatmap-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:3px;width:100%;max-width:100%;}
+.heatmap-cell{width:100%;aspect-ratio:1;border-radius:3px;background:var(--bg3);cursor:pointer;transition:transform 0.15s;}
+.heatmap-cell:hover{transform:scale(1.2);box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.heatmap-cell.level-1{background:rgba(108,99,255,0.25);}
+.heatmap-cell.level-2{background:rgba(108,99,255,0.45);}
+.heatmap-cell.level-3{background:rgba(108,99,255,0.65);}
+.heatmap-cell.level-4{background:rgba(108,99,255,0.9);}
+.heatmap-tooltip{position:absolute;background:rgba(0,0,0,0.9);color:#fff;padding:8px 12px;border-radius:6px;font-size:12px;pointer-events:none;white-space:nowrap;opacity:0;transition:opacity 0.2s;z-index:100;top:0;left:0;}
+.heatmap-tooltip.show{opacity:1;}
+.heatmap-legend{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:11px;color:var(--text3);}
+.heatmap-legend .heatmap-cell{width:14px;height:14px;aspect-ratio:auto;}
+.analytics-empty{color:var(--text3);font-size:13px;padding:20px;text-align:center;}
 .tool-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
 .tool-result{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:12px;font-size:14px;display:none;line-height:1.8;}
 .tool-result.show{display:block;}
@@ -880,9 +910,18 @@ select.input-field{cursor:pointer;}
       <!-- ANALYTICS TAB -->
       <div id="panel-analytics" class="tab-panel">
         <div class="section-title">Performance Analytics</div>
+        <div class="chart-legend">
+          <span class="leg-low">● Low (&lt;50%)</span>
+          <span class="leg-mid">● Average (50–69%)</span>
+          <span class="leg-high">● Good (≥70%)</span>
+        </div>
         <div class="chart-grid">
+          <div class="chart-card"><h3>GPA Trend</h3><canvas id="trend-chart"></canvas></div>
+          <div class="chart-card"><h3>Subject Comparison</h3><canvas id="radar-chart"></canvas></div>
           <div class="chart-card"><h3>Subject Scores (%)</h3><canvas id="bar-chart"></canvas></div>
           <div class="chart-card"><h3>Score Distribution</h3><canvas id="pie-chart"></canvas></div>
+          <div class="chart-card full-width"><h3>Subject Progress</h3><div id="progress-rings" class="progress-rings-grid"></div></div>
+          <div class="chart-card full-width"><h3>Study Activity</h3><div id="study-heatmap" class="heatmap-wrap"></div></div>
         </div>
       </div>
 
@@ -954,6 +993,8 @@ var targetGPA = 0;
 var users = [];
 var currentUser = null;
 var charts = {};
+var gpaHistory = [];
+var studyActivity = {};
 var countdownTimer = null;
 var editingSubjectId = null;
 var editingTTId = null;
@@ -1152,6 +1193,11 @@ function saveData() {
     localStorage.setItem('ga_subjects_' + currentUser.email, JSON.stringify(subjects));
     localStorage.setItem('ga_timetable_' + currentUser.email, JSON.stringify(timetable));
     localStorage.setItem('ga_target_' + currentUser.email, String(targetGPA));
+    recordGpaSnapshot();
+    recordStudyActivity();
+  }
+  if (document.getElementById('panel-analytics') && document.getElementById('panel-analytics').classList.contains('active')) {
+    renderCharts();
   }
 }
 
@@ -1160,6 +1206,33 @@ function loadUserData() {
   subjects = parseJSON(localStorage.getItem('ga_subjects_' + currentUser.email), []);
   timetable = parseJSON(localStorage.getItem('ga_timetable_' + currentUser.email), []);
   targetGPA = safeFloat(localStorage.getItem('ga_target_' + currentUser.email), 0);
+  gpaHistory = parseJSON(localStorage.getItem('ga_gpa_history_' + currentUser.email), []);
+  studyActivity = parseJSON(localStorage.getItem('ga_study_activity_' + currentUser.email), {});
+  if (gpaHistory.length === 0 && calcOverallGPA() > 0) recordGpaSnapshot();
+}
+
+function recordGpaSnapshot() {
+  if (!currentUser) return;
+  var gpa = calcOverallGPA();
+  if (gpa <= 0) return;
+  var today = new Date().toISOString().slice(0, 10);
+  gpaHistory = gpaHistory || [];
+  var last = gpaHistory[gpaHistory.length - 1];
+  if (last && last.date === today) {
+    last.gpa = gpa;
+  } else {
+    gpaHistory.push({ date: today, gpa: gpa });
+  }
+  if (gpaHistory.length > 60) gpaHistory = gpaHistory.slice(-60);
+  localStorage.setItem('ga_gpa_history_' + currentUser.email, JSON.stringify(gpaHistory));
+}
+
+function recordStudyActivity() {
+  if (!currentUser) return;
+  var today = new Date().toISOString().slice(0, 10);
+  studyActivity = studyActivity || {};
+  studyActivity[today] = (studyActivity[today] || 0) + 1;
+  localStorage.setItem('ga_study_activity_' + currentUser.email, JSON.stringify(studyActivity));
 }
 
 // ============================================================
@@ -1606,61 +1679,340 @@ document.getElementById('add-tt-btn').addEventListener('click', function() {
 // ============================================================
 // RENDER CHARTS
 // ============================================================
+function scoreColor(pct) {
+  if (pct >= 70) return '#22c55e';
+  if (pct >= 50) return '#f59e0b';
+  return '#ef4444';
+}
+
+function getDistinctColors(count) {
+  var palette = [
+    '#6c63ff', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6',
+    '#8b5cf6', '#ec4899', '#10b981', '#f97316', '#06b6d4',
+    '#84cc16', '#f43f5e', '#a855f7', '#14b8a6', '#eab308',
+    '#6366f1', '#22d3ee', '#fb923c', '#fbbf24', '#4ade80'
+  ];
+  var result = [];
+  for (var i = 0; i < count; i++) {
+    result.push(palette[i % palette.length]);
+  }
+  return result;
+}
+
+function getAnalyticsSubjects() {
+  var out = [];
+  (subjects || []).forEach(function(s) {
+    if (!s) return;
+    var pct = getSubjectPct(s);
+    if (pct === null && s.gpa != null && s.gpa !== '') {
+      pct = safeFloat(s.gpa, 0) * 25;
+    }
+    if (pct === null) return;
+    out.push({
+      name: s.name,
+      pct: Math.min(100, Math.max(0, pct)),
+      gpa: s.gpa != null && s.gpa !== '' ? safeFloat(s.gpa, 0) : pctToGPA(pct, s.system || 'pakistan')
+    });
+  });
+  return out;
+}
+
+function destroyChart(key) {
+  if (charts[key]) { charts[key].destroy(); charts[key] = null; }
+}
+
+function chartTextColor() { return '#9090aa'; }
+
+function renderProgressRings(items) {
+  var el = document.getElementById('progress-rings');
+  if (!el) return;
+  if (!items.length) {
+    el.innerHTML = '<div class="analytics-empty">Add subjects with marks to see progress rings.</div>';
+    return;
+  }
+  var distinctColors = getDistinctColors(items.length);
+  el.innerHTML = items.map(function(item, idx) {
+    var color = distinctColors[idx];
+    return '<div class="progress-ring-item">' +
+      '<div class="progress-ring" style="--pct:' + item.pct.toFixed(0) + ';--ring-color:' + color + '">' +
+      '<div class="progress-ring-inner">' + item.pct.toFixed(0) + '%</div></div>' +
+      '<div class="progress-ring-label" title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</div></div>';
+  }).join('');
+}
+
+function renderStudyHeatmap() {
+  var el = document.getElementById('study-heatmap');
+  if (!el) return;
+  studyActivity = studyActivity || {};
+  
+  var today = new Date();
+  var totalDays = 84;
+  var weeks = Math.ceil(totalDays / 7);
+  
+  var months = [];
+  var cells = '';
+  var currentMonth = '';
+  var monthSpans = {};
+  var cellData = [];
+  
+  for (var i = totalDays - 1; i >= 0; i--) {
+    var d = new Date(today);
+    d.setDate(d.getDate() - i);
+    var key = d.toISOString().slice(0, 10);
+    var count = studyActivity[key] || 0;
+    var level = count >= 4 ? 4 : count;
+    
+    var monthYear = d.toLocaleDateString('en-US', { month: 'short' });
+    if (monthYear !== currentMonth) {
+      if (!monthSpans[monthYear]) monthSpans[monthYear] = 0;
+      currentMonth = monthYear;
+      months.push(monthYear);
+    }
+    if (monthSpans[currentMonth] !== undefined) monthSpans[currentMonth]++;
+    
+    var dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    cellData.push({ date: dateStr, count: count, level: level });
+    cells += '<div class="heatmap-cell level-' + level + '" data-idx="' + cellData.length + '"></div>';
+  }
+  
+  var uniqueMonths = [];
+  var seen = {};
+  months.forEach(function(m) {
+    if (!seen[m]) {
+      uniqueMonths.push(m);
+      seen[m] = true;
+    }
+  });
+  
+  var monthLabels = uniqueMonths.map(function(m) { return '<span>' + m + '</span>'; }).join('');
+  
+  el.innerHTML = 
+    '<div class="heatmap-header">Study Activity <small>(Last 12 weeks - Updates per day)</small></div>' +
+    '<div class="heatmap-main">' +
+      '<div class="heatmap-days"><span>Mon</span><span>Wed</span><span>Fri</span><span>Sun</span></div>' +
+      '<div class="heatmap-content">' +
+        '<div class="heatmap-months">' + monthLabels + '</div>' +
+        '<div class="heatmap-grid">' + cells + '</div>' +
+        '<div class="heatmap-tooltip"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="heatmap-legend"><span>Less</span>' +
+    '<div class="heatmap-cell level-0"></div><div class="heatmap-cell level-1"></div>' +
+    '<div class="heatmap-cell level-2"></div><div class="heatmap-cell level-3"></div>' +
+    '<div class="heatmap-cell level-4"></div><span>More</span></div>';
+  
+  var tooltip = el.querySelector('.heatmap-tooltip');
+  var heatmapCells = el.querySelectorAll('.heatmap-grid .heatmap-cell');
+  
+  heatmapCells.forEach(function(cell, idx) {
+    cell.addEventListener('mouseenter', function(e) {
+      var data = cellData[idx];
+      if (!data) return;
+      tooltip.textContent = data.date + ': ' + data.count + ' update' + (data.count === 1 ? '' : 's');
+      tooltip.classList.add('show');
+      
+      var rect = cell.getBoundingClientRect();
+      var gridRect = el.querySelector('.heatmap-content').getBoundingClientRect();
+      tooltip.style.left = (rect.left - gridRect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+      tooltip.style.top = (rect.top - gridRect.top - tooltip.offsetHeight - 8) + 'px';
+    });
+    
+    cell.addEventListener('mouseleave', function() {
+      tooltip.classList.remove('show');
+    });
+  });
+}
+
 function renderCharts() {
-  var scored = subjects.filter(function(s) {
-    return s.marks !== null && s.marks !== undefined && s.marks !== '';
-  });
-  var labels = scored.map(function(s) { return s.name; });
-  var values = scored.map(function(s) {
-    return ((safeFloat(s.marks, 0) / safeFloat(s.total, 100)) * 100).toFixed(1);
-  });
+  var items = getAnalyticsSubjects();
+  var labels = items.map(function(i) { return i.name; });
+  var values = items.map(function(i) { return parseFloat(i.pct.toFixed(1)); });
+  var distinctColors = getDistinctColors(items.length);
 
-  var colors = ['#6c63ff','#22c55e','#f59e0b','#ef4444','#8b85ff','#a78bfa','#38bdf8','#f472b6'];
+  destroyChart('bar');
+  destroyChart('pie');
+  destroyChart('trend');
+  destroyChart('radar');
 
-  if (charts.bar) { charts.bar.destroy(); charts.bar = null; }
-  if (charts.pie) { charts.pie.destroy(); charts.pie = null; }
+  var animOpts = { duration: 900, easing: 'easeOutQuart' };
 
-  var barCtx = document.getElementById('bar-chart').getContext('2d');
-  charts.bar = new Chart(barCtx, {
-    type: 'bar',
-    data: {
-      labels: labels.length ? labels : ['No Data'],
-      datasets: [{
-        label: 'Score %',
-        data: values.length ? values : [0],
-        backgroundColor: labels.length ? labels.map(function(_, i) { return colors[i % colors.length]; }) : ['rgba(108,99,255,0.4)'],
-        borderRadius: 8,
-        borderSkipped: false
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { min: 0, max: 100, ticks: { color: '#9090aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        x: { ticks: { color: '#9090aa' }, grid: { display: false } }
+  var barCtx = document.getElementById('bar-chart');
+  if (barCtx) {
+    charts.bar = new Chart(barCtx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels.length ? labels : ['No Data'],
+        datasets: [{
+          label: 'Score %',
+          data: values.length ? values : [0],
+          backgroundColor: labels.length ? distinctColors : ['rgba(108,99,255,0.4)'],
+          borderRadius: 8,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: animOpts,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { min: 0, max: 100, ticks: { color: chartTextColor() }, grid: { color: 'rgba(255,255,255,0.05)' } },
+          x: { ticks: { color: chartTextColor() }, grid: { display: false } }
+        }
       }
-    }
-  });
+    });
+  }
 
-  var pieCtx = document.getElementById('pie-chart').getContext('2d');
-  charts.pie = new Chart(pieCtx, {
-    type: 'doughnut',
-    data: {
-      labels: labels.length ? labels : ['No Data'],
-      datasets: [{
-        data: values.length ? values : [1],
-        backgroundColor: colors,
-        borderWidth: 0,
-        hoverOffset: 8
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: '#9090aa', padding: 12, font: { size: 12 } } } },
-      cutout: '60%'
-    }
-  });
+  var pieCtx = document.getElementById('pie-chart');
+  if (pieCtx) {
+    charts.pie = new Chart(pieCtx.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: labels.length ? labels : ['No Data'],
+        datasets: [{
+          data: values.length ? values : [1],
+          backgroundColor: labels.length ? distinctColors : ['rgba(108,99,255,0.4)'],
+          borderWidth: 0,
+          hoverOffset: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: animOpts,
+        plugins: { legend: { labels: { color: chartTextColor(), padding: 12, font: { size: 12 } } } },
+        cutout: '60%'
+      }
+    });
+  }
+
+  gpaHistory = gpaHistory || [];
+  var trendLabels = gpaHistory.map(function(h) { return h.date.slice(5); });
+  var trendData = gpaHistory.map(function(h) { return h.gpa; });
+  var trendCtx = document.getElementById('trend-chart');
+  if (trendCtx) {
+    var gradient = trendCtx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(108,99,255,0.4)');
+    gradient.addColorStop(1, 'rgba(108,99,255,0.05)');
+    
+    charts.trend = new Chart(trendCtx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: trendLabels.length ? trendLabels : ['—'],
+        datasets: [{
+          label: 'GPA',
+          data: trendData.length ? trendData : [0],
+          borderColor: '#6c63ff',
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#6c63ff',
+          pointBorderWidth: 2,
+          pointHoverBackgroundColor: '#6c63ff',
+          pointHoverBorderColor: '#fff',
+          borderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: animOpts,
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            padding: 12,
+            displayColors: false,
+            callbacks: {
+              label: function(context) {
+                return 'GPA: ' + context.parsed.y.toFixed(2);
+              }
+            }
+          }
+        },
+        scales: {
+          y: { 
+            min: 0, 
+            max: 4, 
+            ticks: { 
+              color: chartTextColor(),
+              stepSize: 0.5
+            }, 
+            grid: { color: 'rgba(255,255,255,0.05)' } 
+          },
+          x: { 
+            ticks: { color: chartTextColor() }, 
+            grid: { display: false } 
+          }
+        }
+      }
+    });
+  }
+
+  var radarCtx = document.getElementById('radar-chart');
+  if (radarCtx) {
+    var radarPointColors = getDistinctColors(labels.length);
+    charts.radar = new Chart(radarCtx.getContext('2d'), {
+      type: 'radar',
+      data: {
+        labels: labels.length ? labels : ['No Data'],
+        datasets: [{
+          label: 'Score %',
+          data: values.length ? values : [0],
+          backgroundColor: 'rgba(108,99,255,0.15)',
+          borderColor: '#6c63ff',
+          pointBackgroundColor: radarPointColors.length ? radarPointColors : ['#6c63ff'],
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: radarPointColors.length ? radarPointColors : ['#6c63ff'],
+          borderWidth: 3,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          pointBorderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: animOpts,
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            padding: 12,
+            callbacks: {
+              label: function(context) {
+                return context.label + ': ' + context.parsed.r.toFixed(1) + '%';
+              }
+            }
+          }
+        },
+        scales: {
+          r: {
+            min: 0,
+            max: 100,
+            ticks: { 
+              color: chartTextColor(), 
+              backdropColor: 'transparent',
+              stepSize: 20
+            },
+            grid: { color: 'rgba(255,255,255,0.1)' },
+            angleLines: { color: 'rgba(255,255,255,0.1)' },
+            pointLabels: { 
+              color: chartTextColor(), 
+              font: { size: 11, weight: 'bold' } 
+            }
+          }
+        }
+      }
+    });
+  }
+
+  renderProgressRings(items);
+  renderStudyHeatmap();
 }
 
 // ============================================================
@@ -2142,7 +2494,7 @@ window.addEventListener('load', function(){
       var user = users.find(function(u){ return u && u.email===email && u.password===pass; });
       if(!user){ showPopup('❌','Login Failed','Incorrect email or password. Please try again.'); return; }
       currentUser = user; localStorage.setItem('ga_current', JSON.stringify(user));
-      try{ loadUserData(); }catch(e){ subjects = parseJSON(localStorage.getItem('ga_subjects_' + user.email), []); timetable = parseJSON(localStorage.getItem('ga_timetable_' + user.email), []); targetGPA = safeFloat(localStorage.getItem('ga_target_' + user.email), 0); }
+      try{ loadUserData(); }catch(e){ subjects = parseJSON(localStorage.getItem('ga_subjects_' + user.email), []); timetable = parseJSON(localStorage.getItem('ga_timetable_' + user.email), []); targetGPA = safeFloat(localStorage.getItem('ga_target_' + user.email), 0); gpaHistory = parseJSON(localStorage.getItem('ga_gpa_history_' + user.email), []); studyActivity = parseJSON(localStorage.getItem('ga_study_activity_' + user.email), {}); }
       var ub = document.getElementById('user-badge'); if(ub) ub.textContent = '👤 ' + user.username;
       showScreen('dashboard-screen'); try{ renderAll(); }catch(e){}
       showToast('Welcome back, ' + user.username + '! 👋', 'success');
