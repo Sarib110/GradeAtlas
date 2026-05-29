@@ -608,24 +608,72 @@ select.input-field{cursor:pointer;}
               if (!s) return;
               if (s.mode) setMode(s.mode === 'relative' ? 'relative' : 'absolute');
               if (s.stage) setStage(s.stage);
+              
+              if (s.mode === 'relative') {
+                var slider = document.getElementById('rel-gpa-slider');
+                var number = document.getElementById('rel-gpa-number');
+                var gpaVal = s.gpa != null ? s.gpa : 3;
+                if (slider) slider.value = gpaVal;
+                if (number) number.value = gpaVal;
+                return;
+              }
+              
               var comp = s.components || {};
               var mid = comp.midterm || {}, ass = comp.assignment || {}, quiz = comp.quiz || {}, proj = comp.project || {}, fin = comp.final || {};
+              
               if (wMid) wMid.value = safeNum(mid.weight, wMid.value);
               if (midObt) midObt.value = (mid.obtained != null && mid.obtained !== undefined) ? mid.obtained : '';
               if (midTot) midTot.value = safeNum(mid.total, 100);
+              
               if (wAss) wAss.value = safeNum(ass.weight, wAss.value);
               if (wQuiz) wQuiz.value = safeNum(quiz.weight, wQuiz.value);
               if (wProject) wProject.value = safeNum(proj.weight, wProject.value);
+              
               if (wFin) wFin.value = safeNum(fin.weight, wFin.value);
               if (finObt) finObt.value = (fin.obtained != null && fin.obtained !== undefined) ? fin.obtained : '';
               if (finTot) finTot.value = safeNum(fin.total, 100);
-              calcPreview();
+              
+              function fillDynRows(items, countEl, buildFn, listEl, obtClass, totClass, nameClass) {
+                var itemsToUse = items && items.length ? items : [];
+                if (!itemsToUse.length && items === undefined) itemsToUse = [{ obt: '', tot: 10 }];
+                var count = itemsToUse.length || 1;
+                if (countEl) countEl.value = count;
+                buildFn(count);
+                
+                setTimeout(function() {
+                  if (!listEl) return;
+                  var obtEls = listEl.querySelectorAll('.' + obtClass);
+                  var totEls = listEl.querySelectorAll('.' + totClass);
+                  var nameEls = nameClass ? listEl.querySelectorAll('.' + nameClass) : [];
+                  
+                  for (var i = 0; i < itemsToUse.length && i < obtEls.length; i++) {
+                    var item = itemsToUse[i] || {};
+                    if (obtEls[i]) obtEls[i].value = item.obt != null && item.obt !== '' ? item.obt : '';
+                    if (totEls[i]) totEls[i].value = item.tot != null && item.tot !== '' ? item.tot : 10;
+                    if (nameEls[i] && item.name) nameEls[i].value = item.name;
+                  }
+                }, 100);
+              }
+              
+              var assItems = ass.items || (ass.obtained != null ? [{ obt: ass.obtained, tot: 100 }] : []);
+              var quizItems = quiz.items || (quiz.obtained != null ? [{ obt: quiz.obtained, tot: 100 }] : []);
+              var projItems = proj.items || (proj.obtained != null ? [{ obt: proj.obtained, tot: 100 }] : []);
+              
+              fillDynRows(assItems, assCount, buildAssignmentRows, assignmentsList, 'assignment-obt', 'assignment-total');
+              fillDynRows(quizItems, quizCount, buildQuizRows, quizzesList, 'quiz-obt', 'quiz-total');
+              
+              if (projectPanel) projectPanel.style.display = safeNum(proj.weight, 0) > 0 ? '' : 'none';
+              if (safeNum(proj.weight, 0) > 0) {
+                fillDynRows(projItems, projectCount, buildProjectRows, projectsList, 'project-obt', 'project-total', 'project-name');
+              }
+              
+              setTimeout(calcPreview, 150);
             };
 
             // add-subject hook: attach stage and final.hidden flag where appropriate
             var addBtn = document.getElementById('add-subject-btn'); if(addBtn) addBtn.addEventListener('click', function(){ var capturedEditId = editingSubjectId; var mode = localStorage.getItem(MODE_KEY) || 'absolute'; if(mode==='absolute'){ var a=safeNum(wMid.value,0), b=safeNum(wAss.value,0), c=safeNum(wQuiz.value,0), d=safeNum(wProject.value,0), e=safeNum(wFin.value,0); var total=a+b+c+d+e||100; var sum=0; var midPct = (midObt && midTot)? getNumericPct(midObt, midTot): null; var assSummary = getRowsSummary(assignmentsList, {obt:'assignment-obt', tot:'assignment-total', label:'A'}); var quizSummary = getRowsSummary(quizzesList, {obt:'quiz-obt', tot:'quiz-total', label:'Q'}); var projectSummary = getRowsSummary(projectsList, {obt:'project-obt', tot:'project-total', label:'P'}); var finPct = (finObt && finTot)? getNumericPct(finObt, finTot): null; if(midPct !== null) sum += midPct * a; if(assSummary.avg !== null) sum += assSummary.avg * b; if(quizSummary.avg !== null) sum += quizSummary.avg * c; if(projectSummary.avg !== null) sum += projectSummary.avg * d; if(finPct !== null) sum += finPct * e; var combined = total? (sum/total)*100 : 0; var marksField = document.getElementById('subject-marks'); if (marksField) marksField.value = combined.toFixed(1); var totalField = document.getElementById('subject-total'); if (totalField) totalField.value = 100; } else { var marksField2 = document.getElementById('subject-marks'); if (marksField2) marksField2.value = ''; var totalField2 = document.getElementById('subject-total'); if (totalField2) totalField2.value = 100; }
 
-              setTimeout(function(){ try{ var wasEdit = capturedEditId != null; var s = null; if(wasEdit) s = subjects.find(function(x){ return x.id===capturedEditId; }); if(!s) s = subjects[subjects.length-1]; if(!s) return; var modeNow = localStorage.getItem(MODE_KEY) || 'absolute'; s.mode = modeNow; s.credits = parseInt(document.getElementById('subject-credits').value)||3; s.system = document.getElementById('subject-system').value||'pakistan'; var stageNow = localStorage.getItem(STAGE_KEY) || 'mid-semester'; s.stage = stageNow; if(modeNow==='absolute'){ var assSummary = getRowsSummary(assignmentsList, {obt:'assignment-obt', tot:'assignment-total', label:'A'}); var quizSummary = getRowsSummary(quizzesList, {obt:'quiz-obt', tot:'quiz-total', label:'Q'}); var projectSummary = getRowsSummary(projectsList, {obt:'project-obt', tot:'project-total', label:'P'}); s.components = { midterm: { weight: safeNum(wMid.value,0), obtained: (midObt.value==='')?null:safeNum(midObt.value,null), total: safeNum(midTot.value,100) }, assignment: { weight: safeNum(wAss.value,0), obtained: assSummary.avg!==null? assSummary.avg : null, total: 100 }, quiz: { weight: safeNum(wQuiz.value,0), obtained: quizSummary.avg!==null? quizSummary.avg : null, total: 100 }, project: { weight: safeNum(wProject.value,0), obtained: projectSummary.avg!==null? projectSummary.avg : null, total: 100 }, final: { weight: safeNum(wFin.value,0), obtained: (finObt.value==='')?null:safeNum(finObt.value,null), total: safeNum(finTot.value,100), hidden: (stageNow==='mid-semester') } }; var pctTxt = (document.getElementById('abs-preview-pct')||{textContent:''}).textContent; var pct = parseFloat(pctTxt) || null; if(pct) s.gpa = pctToGPA(pct, s.system); } else { s.components = {}; s.gpa = parseFloat(document.getElementById('rel-gpa-number').value) || null; } s.dateAdded = s.dateAdded || Date.now(); saveData(); renderAll(); if(!wasEdit){ resetAbsoluteDefaults(); var nameField = document.getElementById('subject-name'); if(nameField) nameField.value=''; var marksField = document.getElementById('subject-marks'); if(marksField) marksField.value=''; var totalField = document.getElementById('subject-total'); if(totalField) totalField.value='100'; calcPreview(); } }catch(e){ console.error(e); } },80);
+              setTimeout(function(){ try{ var wasEdit = capturedEditId != null; var s = null; if(wasEdit) s = subjects.find(function(x){ return x.id===capturedEditId; }); if(!s) s = subjects[subjects.length-1]; if(!s) return; var modeNow = localStorage.getItem(MODE_KEY) || 'absolute'; s.mode = modeNow; s.credits = parseInt(document.getElementById('subject-credits').value)||3; s.system = document.getElementById('subject-system').value||'pakistan'; var stageNow = localStorage.getItem(STAGE_KEY) || 'mid-semester'; s.stage = stageNow; if(modeNow==='absolute'){ var assSummary = getRowsSummary(assignmentsList, {obt:'assignment-obt', tot:'assignment-total', label:'A'}); var quizSummary = getRowsSummary(quizzesList, {obt:'quiz-obt', tot:'quiz-total', label:'Q'}); var projectSummary = getRowsSummary(projectsList, {obt:'project-obt', tot:'project-total', name:'project-name', label:'P'}); s.components = { midterm: { weight: safeNum(wMid.value,0), obtained: (midObt.value==='')?null:safeNum(midObt.value,null), total: safeNum(midTot.value,100) }, assignment: { weight: safeNum(wAss.value,0), obtained: assSummary.avg!==null? assSummary.avg : null, total: 100, items: assSummary.items||[] }, quiz: { weight: safeNum(wQuiz.value,0), obtained: quizSummary.avg!==null? quizSummary.avg : null, total: 100, items: quizSummary.items||[] }, project: { weight: safeNum(wProject.value,0), obtained: projectSummary.avg!==null? projectSummary.avg : null, total: 100, items: projectSummary.items||[] }, final: { weight: safeNum(wFin.value,0), obtained: (finObt.value==='')?null:safeNum(finObt.value,null), total: safeNum(finTot.value,100), hidden: (stageNow==='mid-semester') } }; var pctTxt = (document.getElementById('abs-preview-pct')||{textContent:''}).textContent; var pct = parseFloat(pctTxt) || null; if(pct) s.gpa = pctToGPA(pct, s.system); } else { s.components = {}; s.gpa = parseFloat(document.getElementById('rel-gpa-number').value) || null; } s.dateAdded = s.dateAdded || Date.now(); saveData(); renderAll(); if(!wasEdit){ resetAbsoluteDefaults(); var nameField = document.getElementById('subject-name'); if(nameField) nameField.value=''; var marksField = document.getElementById('subject-marks'); if(marksField) marksField.value=''; var totalField = document.getElementById('subject-total'); if(totalField) totalField.value='100'; calcPreview(); } }catch(e){ console.error(e); } },80);
             });
 
             // Rich subject card renderer with stage badges and border colors
@@ -807,6 +855,11 @@ function generateId() {
 }
 
 function safeFloat(val, fallback) {
+  var n = parseFloat(val);
+  return isFinite(n) ? n : fallback;
+}
+
+function safeNum(val, fallback) {
   var n = parseFloat(val);
   return isFinite(n) ? n : fallback;
 }
@@ -1166,17 +1219,88 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
     var wFin = safeFloat((document.getElementById('comp-final-weight')||{value:0}).value, 0);
     var sum = wMid + wAss + wQuiz + wProject + wFin;
     if (sum !== 100) { showPopup('⚠️', 'Weights Invalid', 'Component weights must sum to 100%. Current sum: ' + sum + '%'); return; }
+    
+    function collectRowItems(listEl, obtClass, totClass, nameClass) {
+      if (!listEl) return [];
+      var items = [];
+      var rows = listEl.querySelectorAll('.' + obtClass);
+      for (var i = 0; i < rows.length; i++) {
+        var obtEl = rows[i];
+        var parent = obtEl.closest('div').parentElement;
+        var totEl = parent.querySelector('.' + totClass);
+        var nameEl = nameClass ? parent.querySelector('.' + nameClass) : null;
+        var obt = obtEl.value.trim() === '' ? null : safeFloat(obtEl.value, null);
+        var tot = totEl ? safeFloat(totEl.value, 10) : 10;
+        var name = nameEl ? nameEl.value.trim() : '';
+        items.push({ obt: obt, tot: tot, name: name || ('Item ' + (i+1)) });
+      }
+      return items;
+    }
+    
+    function calcAvgFromItems(items) {
+      if (!items || !items.length) return null;
+      var totalPct = 0; var count = 0;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].obt !== null && items[i].tot > 0) {
+          totalPct += (items[i].obt / items[i].tot) * 100;
+          count++;
+        }
+      }
+      return count > 0 ? totalPct / count : null;
+    }
+    
+    var assignmentsList = document.getElementById('assignments-list');
+    var quizzesList = document.getElementById('quizzes-list');
+    var projectsList = document.getElementById('projects-list');
+    
+    var assItems = collectRowItems(assignmentsList, 'assignment-obt', 'assignment-total');
+    var quizItems = collectRowItems(quizzesList, 'quiz-obt', 'quiz-total');
+    var projItems = collectRowItems(projectsList, 'project-obt', 'project-total', 'project-name');
+    
     components = {
       midterm: { weight: wMid, obtained: (document.getElementById('comp-mid-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-mid-obt').value, null), total: safeFloat((document.getElementById('comp-mid-total')||{value:100}).value,100) },
-      assignment: { weight: wAss, obtained: (document.getElementById('comp-assn-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-assn-obt').value, null), total: safeFloat((document.getElementById('comp-assn-total')||{value:100}).value,100) },
+      assignment: { weight: wAss, obtained: calcAvgFromItems(assItems), total: 100, items: assItems },
+      quiz: { weight: wQuiz, obtained: calcAvgFromItems(quizItems), total: 100, items: quizItems },
+      project: { weight: wProject, obtained: calcAvgFromItems(projItems), total: 100, items: projItems },
       final: { weight: wFin, obtained: (document.getElementById('comp-final-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-final-obt').value, null), total: safeFloat((document.getElementById('comp-final-total')||{value:100}).value,100), hidden: (stage==='mid-semester') }
     };
+  }
+
+  var gpa = null;
+  if (mode === 'absolute') {
+    if (marks !== null) {
+      gpa = pctToGPA(marks, system);
+    } else if (components.midterm || components.assignment || components.quiz || components.project || components.final) {
+      function calcCompPct(c) {
+        if (!c || c.obtained === null || c.obtained === undefined) return null;
+        var tot = c.total || 100;
+        return tot > 0 ? (c.obtained / tot) * 100 : null;
+      }
+      var weighted = 0;
+      var hasAny = false;
+      ['midterm', 'assignment', 'quiz', 'project', 'final'].forEach(function(key) {
+        var c = components[key];
+        if (!c) return;
+        var pct = calcCompPct(c);
+        if (pct !== null) {
+          weighted += pct * ((c.weight || 0) / 100);
+          hasAny = true;
+        }
+      });
+      if (hasAny) {
+        marks = weighted;
+        total = 100;
+        gpa = pctToGPA(weighted, system);
+      }
+    }
+  } else if (mode === 'relative') {
+    gpa = safeFloat((document.getElementById('rel-gpa-number') || { value: '' }).value, null);
   }
 
   if (editingSubjectId !== null) {
     var idx = subjects.findIndex(function(x) { return x.id === editingSubjectId; });
     if (idx !== -1) {
-      subjects[idx] = { id: editingSubjectId, name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage };
+      subjects[idx] = { id: editingSubjectId, name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage, gpa: gpa };
     }
     cancelEditSubject();
     showToast('Subject updated!', 'success');
@@ -1184,7 +1308,7 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
     if (typeof saveUserData === 'function') saveUserData(); else saveData();
     renderSubjects(); renderOverview();
   } else {
-    var newSub = { id: generateId(), name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage };
+    var newSub = { id: generateId(), name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage, gpa: gpa };
     subjects.push(newSub);
     // persist
     if (typeof saveUserData === 'function') saveUserData(); else saveData();
