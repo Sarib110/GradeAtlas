@@ -161,6 +161,27 @@ select.input-field{cursor:pointer;}
 .tt-card-subject{font-size:16px;font-weight:700;margin-bottom:4px;}
 .tt-card-time{font-size:13px;color:var(--text2);margin-bottom:12px;}
 .tt-card-actions{display:flex;gap:8px;}
+.ai-mode-toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);cursor:pointer;user-select:none;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:999px;}
+.ai-mode-toggle input{cursor:pointer;}
+.ai-mode-toggle.active{background:rgba(108,99,255,0.15);border-color:rgba(108,99,255,0.4);color:var(--text);}
+.study-priority-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;}
+.study-priority-panel h3{font-size:15px;margin:0 0 4px 0;}
+.study-priority-sub{font-size:12px;color:var(--text2);margin:0 0 12px 0;}
+.study-priority-list{display:flex;flex-direction:column;gap:8px;}
+.study-priority-item{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;}
+.study-priority-item-rank{font-size:18px;font-weight:700;color:var(--primary2);min-width:28px;}
+.study-priority-item-body{flex:1;min-width:180px;}
+.study-priority-item-name{font-weight:700;font-size:14px;}
+.study-priority-item-reasons{font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5;}
+.priority-badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;margin-bottom:6px;}
+.priority-critical{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);}
+.priority-high{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3);}
+.priority-medium{background:rgba(234,179,8,0.12);color:#eab308;border:1px solid rgba(234,179,8,0.25);}
+.priority-low{background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.25);}
+.tt-card-ai-tip{font-size:12px;color:var(--text2);margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--primary);}
+.tt-card.priority-critical{border-color:rgba(239,68,68,0.35);}
+.tt-card.priority-high{border-color:rgba(245,158,11,0.35);}
+.tt-card.priority-medium{border-color:rgba(234,179,8,0.25);}
 /* POPUP */
 .popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:600;align-items:center;justify-content:center;padding:20px;}
 .popup-overlay.active{display:flex;}
@@ -978,7 +999,17 @@ select.input-field{cursor:pointer;}
 
       <!-- TIMETABLE TAB -->
       <div id="panel-timetable" class="tab-panel">
-        <div class="section-title">🗓️ Timetable</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+          <div class="section-title" style="margin:0;">🗓️ Timetable</div>
+          <label class="ai-mode-toggle" id="ai-mode-toggle-label">
+            <input type="checkbox" id="ai-study-mode"> 🤖 AI Study Priority Mode
+          </label>
+        </div>
+        <div id="study-priority-panel" class="study-priority-panel" style="display:none;">
+          <h3>📊 Study Priority Ranking</h3>
+          <p class="study-priority-sub">Subjects ranked by GPA risk, target gap, final urgency, and chapter progress.</p>
+          <div id="study-priority-list" class="study-priority-list"></div>
+        </div>
         <div class="add-form">
           <div id="tt-edit-notice" class="edit-mode-notice">
             ✏️ Editing class — update fields and click Update Class
@@ -1123,6 +1154,7 @@ var currentUser = null;
 var charts = {};
 var gpaHistory = [];
 var studyActivity = {};
+var aiStudyMode = false;
 var countdownTimer = null;
 var editingSubjectId = null;
 var editingTTId = null;
@@ -1457,7 +1489,144 @@ function renderPredictor() {
     '</div>' +
     (pendingCount ? '<p style="font-size:13px;color:var(--text2);margin:0 0 8px;">' + pendingCount + ' subject(s) need final marks. Projected GPA assumes you hit the required finals.</p>' : '') +
     (impossibleCount ? '<p style="font-size:13px;color:var(--red);margin:0 0 8px;">⚠️ ' + impossibleCount + ' subject(s) cannot reach target even with 100% in finals.</p>' : '') +
-    '<div class="predictor-list">' + rows.join('') + '</div>';
+    '<div class="predictor-list">' + rows.join('') +   '</div>';
+}
+
+function findSubjectForTimetable(name) {
+  if (!name) return null;
+  var lower = name.trim().toLowerCase();
+  subjects = subjects || [];
+  var exact = subjects.find(function(s) { return s && s.name.trim().toLowerCase() === lower; });
+  if (exact) return exact;
+  return subjects.find(function(s) {
+    if (!s) return false;
+    var sn = s.name.trim().toLowerCase();
+    return sn.indexOf(lower) !== -1 || lower.indexOf(sn) !== -1;
+  }) || null;
+}
+
+function calcStudyPriorityScore(s) {
+  if (!s) return 25;
+  var score = 0;
+  var gpa = getSubjectGpa(s);
+  var pct = getSubjectPct(s);
+  if (gpa !== null) {
+    if (gpa < 2.0) score += 40;
+    else if (gpa < 2.5) score += 32;
+    else if (gpa < 3.0) score += 22;
+    else if (gpa < 3.5) score += 12;
+    else score += 4;
+  } else {
+    score += 15;
+  }
+  if (targetGPA > 0 && gpa !== null && gpa < targetGPA) {
+    score += Math.min(20, (targetGPA - gpa) * 15);
+  }
+  var goal = targetGPA > 0 ? targetGPA : 3.0;
+  var pred = predictFinalForSubject(s, goal);
+  if (pred) {
+    if (pred.status === 'impossible') score += 25;
+    else if (pred.status === 'hard') score += 20;
+    else if (pred.status === 'achievable') score += 12;
+    else if (pred.status === 'easy') score += 5;
+  }
+  var chProg = getChapterProgress(s.chapters);
+  if (chProg && chProg.pct < 100) {
+    score += Math.round((100 - chProg.pct) * 0.15);
+  }
+  score += Math.min(10, safeFloat(s.credits, 3) * 2);
+  if (pct !== null && pct < 50) score += 15;
+  else if (pct !== null && pct < 70) score += 8;
+  return Math.min(100, Math.round(score));
+}
+
+function getPriorityTier(score) {
+  if (score >= 75) return { label: 'Critical', class: 'priority-critical', icon: '🔴' };
+  if (score >= 55) return { label: 'High', class: 'priority-high', icon: '🟠' };
+  if (score >= 35) return { label: 'Medium', class: 'priority-medium', icon: '🟡' };
+  return { label: 'Low', class: 'priority-low', icon: '🟢' };
+}
+
+function getStudyPriorityReasons(s) {
+  var reasons = [];
+  if (!s) return ['Link this class to a subject in the Subjects tab'];
+  var gpa = getSubjectGpa(s);
+  if (gpa !== null && gpa < 2.0) reasons.push('GPA at risk (' + gpa.toFixed(2) + ')');
+  else if (targetGPA > 0 && gpa !== null && gpa < targetGPA) reasons.push('Below your target GPA of ' + targetGPA.toFixed(2));
+  var goal = targetGPA > 0 ? targetGPA : 3.0;
+  var pred = predictFinalForSubject(s, goal);
+  if (pred && pred.status === 'impossible') reasons.push('Final target may be unreachable');
+  else if (pred && pred.status === 'hard') reasons.push('High final marks needed');
+  else if (pred && (pred.status === 'achievable' || pred.status === 'easy')) reasons.push(pred.message);
+  var ch = getChapterProgress(s.chapters);
+  if (ch && ch.pct < 50) reasons.push('Only ' + ch.pct + '% chapters done');
+  else if (ch && ch.pct < 100) reasons.push('Chapters ' + ch.done + '/' + ch.total + ' complete');
+  if (safeFloat(s.credits, 3) >= 4) reasons.push('High credit weight (' + safeFloat(s.credits, 3) + ' cr)');
+  if (!reasons.length) reasons.push('Keep up regular review');
+  return reasons;
+}
+
+function getStudyPriorityEntries() {
+  subjects = subjects || [];
+  timetable = timetable || [];
+  var seen = {};
+  var entries = [];
+  subjects.forEach(function(s) {
+    if (!s) return;
+    var score = calcStudyPriorityScore(s);
+    var tier = getPriorityTier(score);
+    var ttSlots = timetable.filter(function(t) {
+      return t && findSubjectForTimetable(t.subject) === s;
+    }).length;
+    entries.push({ subject: s, score: score, tier: tier, slots: ttSlots, reasons: getStudyPriorityReasons(s) });
+    seen[s.id] = true;
+  });
+  timetable.forEach(function(t) {
+    if (!t) return;
+    var s = findSubjectForTimetable(t.subject);
+    if (s && seen[s.id]) return;
+    if (!s) {
+      var key = 'tt_' + t.subject;
+      if (seen[key]) return;
+      seen[key] = true;
+      var score = 25;
+      entries.push({ subject: null, name: t.subject, score: score, tier: getPriorityTier(score), slots: 1, reasons: getStudyPriorityReasons(null) });
+    }
+  });
+  entries.sort(function(a, b) { return b.score - a.score; });
+  return entries;
+}
+
+function renderStudyPriorityPanel() {
+  var panel = document.getElementById('study-priority-panel');
+  var list = document.getElementById('study-priority-list');
+  var toggle = document.getElementById('ai-study-mode');
+  var toggleLabel = document.getElementById('ai-mode-toggle-label');
+  if (toggle) aiStudyMode = !!toggle.checked;
+  if (toggleLabel) toggleLabel.classList.toggle('active', aiStudyMode);
+  if (!panel || !list) return;
+  if (!aiStudyMode) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+  var entries = getStudyPriorityEntries();
+  if (!entries.length) {
+    list.innerHTML = '<div class="predictor-empty">Add subjects and classes to get AI study recommendations.</div>';
+    return;
+  }
+  list.innerHTML = entries.map(function(e, i) {
+    var name = e.subject ? e.subject.name : e.name;
+    var slotText = e.slots ? ' • ' + e.slots + ' class slot' + (e.slots > 1 ? 's' : '') : '';
+    return '<div class="study-priority-item">' +
+      '<div class="study-priority-item-rank">#' + (i + 1) + '</div>' +
+      '<div class="study-priority-item-body">' +
+        '<div class="study-priority-item-name">' + escapeHtml(name) + slotText + '</div>' +
+        '<div class="study-priority-item-reasons">' + e.reasons.map(function(r) { return escapeHtml(r); }).join(' • ') + '</div>' +
+      '</div>' +
+      '<span class="priority-badge ' + e.tier.class + '">' + e.tier.icon + ' ' + e.tier.label + ' (' + e.score + ')</span>' +
+    '</div>';
+  }).join('');
 }
 
 function parseJSON(str, fallback) {
@@ -1543,6 +1712,7 @@ function switchTab(name) {
   document.querySelectorAll('[data-tab="' + name + '"]').forEach(function(b) { b.classList.add('active'); });
   if (name === 'analytics') renderCharts();
   if (name === 'tools') renderPredictor();
+  if (name === 'timetable') renderTimetable();
 }
 
 document.querySelectorAll('.sidebar-item, .bnav-item').forEach(function(btn) {
@@ -1634,6 +1804,7 @@ function loadUserData() {
   targetGPA = safeFloat(localStorage.getItem('ga_target_' + currentUser.email), 0);
   gpaHistory = parseJSON(localStorage.getItem('ga_gpa_history_' + currentUser.email), []);
   studyActivity = parseJSON(localStorage.getItem('ga_study_activity_' + currentUser.email), {});
+  aiStudyMode = localStorage.getItem('ga_ai_study_' + currentUser.email) === '1';
   if (gpaHistory.length === 0 && calcOverallGPA() > 0) recordGpaSnapshot();
 }
 
@@ -1658,8 +1829,9 @@ function recordStudyActivity() {
   var today = new Date().toISOString().slice(0, 10);
   studyActivity = studyActivity || {};
   studyActivity[today] = (studyActivity[today] || 0) + 1;
-  localStorage.setItem('ga_study_activity_' + currentUser.email, JSON.stringify(studyActivity));
-}
+    localStorage.setItem('ga_study_activity_' + currentUser.email, JSON.stringify(studyActivity));
+    localStorage.setItem('ga_ai_study_' + currentUser.email, aiStudyMode ? '1' : '0');
+  }
 
 // ============================================================
 // RENDER OVERVIEW
@@ -2136,6 +2308,10 @@ var clearBtn = document.getElementById('clear-panel-btn'); if(clearBtn){ clearBt
 // ============================================================
 function renderTimetable() {
   timetable = timetable || [];
+  var aiToggle = document.getElementById('ai-study-mode');
+  if (aiToggle) aiToggle.checked = aiStudyMode;
+  renderStudyPriorityPanel();
+
   var container = document.getElementById('timetable-list');
   container.innerHTML = '';
   if (!timetable.length) {
@@ -2149,10 +2325,23 @@ function renderTimetable() {
   });
   sorted.forEach(function(t) {
     if (!t) return;
+    var matchedSubject = findSubjectForTimetable(t.subject);
+    var priorityHtml = '';
+    var cardClass = 'tt-card';
+    if (aiStudyMode) {
+      var score = calcStudyPriorityScore(matchedSubject);
+      var tier = getPriorityTier(score);
+      cardClass += ' ' + tier.class;
+      var reasons = getStudyPriorityReasons(matchedSubject);
+      priorityHtml = '<span class="priority-badge ' + tier.class + '">' + tier.icon + ' ' + tier.label + ' Priority</span>' +
+        '<div class="tt-card-ai-tip">💡 Focus: ' + escapeHtml(reasons[0] || 'Review this subject') + '</div>';
+    }
+
     var card = document.createElement('div');
-    card.className = 'tt-card';
+    card.className = cardClass;
     card.innerHTML =
       '<div class="tt-card-day">' + t.day + '</div>' +
+      priorityHtml +
       '<div class="tt-card-subject">' + escapeHtml(t.subject) + '</div>' +
       '<div class="tt-card-time">⏰ ' + t.start + ' – ' + t.end + '</div>' +
       '<div class="tt-card-actions"></div>';
@@ -2222,6 +2411,16 @@ function cancelEditTT() {
   document.getElementById('tt-subject').value = '';
   document.getElementById('tt-start').value = '';
   document.getElementById('tt-end').value = '';
+}
+
+var aiStudyToggle = document.getElementById('ai-study-mode');
+if (aiStudyToggle) {
+  aiStudyToggle.addEventListener('change', function() {
+    aiStudyMode = aiStudyToggle.checked;
+    if (currentUser) localStorage.setItem('ga_ai_study_' + currentUser.email, aiStudyMode ? '1' : '0');
+    renderTimetable();
+    showToast(aiStudyMode ? 'AI Study Priority Mode enabled 🤖' : 'AI Study Priority Mode disabled', 'info');
+  });
 }
 
 document.getElementById('cancel-tt-edit-btn').addEventListener('click', cancelEditTT);
