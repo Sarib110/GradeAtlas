@@ -153,6 +153,30 @@ select.input-field{cursor:pointer;}
 .predictor-status-done{color:var(--text2);}
 .predictor-empty{text-align:center;padding:24px;color:var(--text2);}
 .predictor-presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.risk-analyzer-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
+.risk-analyzer-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+.risk-semester-badge{padding:10px 18px;border-radius:12px;font-weight:700;font-size:15px;text-align:center;min-width:140px;}
+.risk-semester-badge.risk-critical{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.35);}
+.risk-semester-badge.risk-high{background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.35);}
+.risk-semester-badge.risk-medium{background:rgba(234,179,8,0.12);color:#eab308;border:1px solid rgba(234,179,8,0.3);}
+.risk-semester-badge.risk-low{background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.3);}
+.risk-stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:16px;}
+.risk-stat{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+.risk-stat-label{font-size:11px;color:var(--text2);}
+.risk-stat-value{font-size:18px;font-weight:700;margin-top:2px;}
+.risk-subject-list{display:flex;flex-direction:column;gap:8px;}
+.risk-subject-item{padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;border-left:4px solid var(--border);}
+.risk-subject-item.risk-critical{border-left-color:var(--red);}
+.risk-subject-item.risk-high{border-left-color:var(--amber);}
+.risk-subject-item.risk-medium{border-left-color:#eab308;}
+.risk-subject-item.risk-low{border-left-color:var(--green);}
+.risk-subject-name{font-weight:700;font-size:14px;margin-bottom:4px;}
+.risk-factor{font-size:12px;color:var(--text2);line-height:1.5;}
+.risk-factor.critical{color:var(--red);}
+.risk-factor.high{color:var(--amber);}
+.risk-recommendations{margin-top:14px;padding:12px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);}
+.risk-recommendations h4{margin:0 0 8px 0;font-size:13px;}
+.risk-recommendations ul{margin:0;padding-left:18px;font-size:13px;color:var(--text2);line-height:1.7;}
 .countdown-display{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--primary2);padding:14px 0;text-align:center;}
 .tt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:16px;}
 .tt-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;transition:border-color 0.2s;}
@@ -1053,6 +1077,18 @@ select.input-field{cursor:pointer;}
       <!-- ANALYTICS TAB -->
       <div id="panel-analytics" class="tab-panel">
         <div class="section-title">Performance Analytics</div>
+        <div id="risk-analyzer" class="risk-analyzer-card">
+          <div class="risk-analyzer-header">
+            <div>
+              <h3 style="margin:0 0 4px 0;font-size:16px;">🛡️ Academic Risk Analyzer</h3>
+              <p style="margin:0;font-size:13px;color:var(--text2);">Detects at-risk subjects based on GPA, targets, finals, and progress.</p>
+            </div>
+            <div id="risk-semester-badge" class="risk-semester-badge risk-low">✅ Safe</div>
+          </div>
+          <div id="risk-stats-row" class="risk-stats-row"></div>
+          <div id="risk-subject-list" class="risk-subject-list"></div>
+          <div id="risk-recommendations" class="risk-recommendations" style="display:none;"></div>
+        </div>
         <div class="chart-legend">
           <span class="leg-low">● Low (&lt;50%)</span>
           <span class="leg-mid">● Average (50–69%)</span>
@@ -1629,6 +1665,199 @@ function renderStudyPriorityPanel() {
   }).join('');
 }
 
+function analyzeSubjectRisk(s) {
+  var factors = [];
+  var riskScore = 0;
+  if (!s) return { subject: s, score: 0, tier: 'low', factors: [] };
+  var gpa = getSubjectGpa(s);
+  var pct = getSubjectPct(s);
+
+  if (gpa !== null && gpa < 2.0) {
+    factors.push({ level: 'critical', text: 'GPA below 2.0 (' + gpa.toFixed(2) + ')' });
+    riskScore += 40;
+  } else if (gpa !== null && gpa < 2.5) {
+    factors.push({ level: 'high', text: 'GPA below 2.5 (' + gpa.toFixed(2) + ')' });
+    riskScore += 28;
+  } else if (gpa !== null && gpa < 3.0) {
+    factors.push({ level: 'medium', text: 'GPA below 3.0 (' + gpa.toFixed(2) + ')' });
+    riskScore += 15;
+  }
+
+  if (targetGPA > 0 && gpa !== null && gpa < targetGPA) {
+    factors.push({ level: 'high', text: 'Below target GPA of ' + targetGPA.toFixed(2) });
+    riskScore += Math.min(25, (targetGPA - gpa) * 20);
+  }
+
+  var goal = targetGPA > 0 ? targetGPA : 3.0;
+  var pred = predictFinalForSubject(s, goal);
+  if (pred && pred.status === 'impossible') {
+    factors.push({ level: 'critical', text: 'Cannot reach target even with 100% in final' });
+    riskScore += 30;
+  } else if (pred && pred.status === 'hard') {
+    factors.push({ level: 'high', text: pred.message });
+    riskScore += 18;
+  } else if (pred && pred.status === 'achievable') {
+    factors.push({ level: 'medium', text: 'Final marks need attention' });
+    riskScore += 8;
+  }
+
+  if (pct !== null && pct < 50) {
+    factors.push({ level: 'critical', text: 'Overall score below 50%' });
+    riskScore += 25;
+  } else if (pct !== null && pct < 60) {
+    factors.push({ level: 'high', text: 'Overall score below 60%' });
+    riskScore += 12;
+  }
+
+  var ch = getChapterProgress(s.chapters);
+  if (ch && ch.pct < 30) {
+    factors.push({ level: 'medium', text: 'Chapter progress very low (' + ch.pct + '%)' });
+    riskScore += 10;
+  } else if (ch && ch.pct < 60) {
+    factors.push({ level: 'medium', text: 'Chapter progress lagging (' + ch.pct + '%)' });
+    riskScore += 5;
+  }
+
+  var fin = s.components && s.components.final;
+  if (fin && safeFloat(fin.weight, 0) > 0 && (fin.obtained === null || fin.obtained === undefined)) {
+    if (s.stage === 'post-midterm' || s.stage === 'complete') {
+      factors.push({ level: 'medium', text: 'Final exam marks not entered' });
+      riskScore += 8;
+    }
+  }
+
+  if (!factors.length) {
+    factors.push({ level: 'low', text: 'No major risk factors detected' });
+  }
+
+  riskScore = Math.min(100, Math.round(riskScore));
+  var tier = 'low';
+  if (riskScore >= 70) tier = 'critical';
+  else if (riskScore >= 45) tier = 'high';
+  else if (riskScore >= 25) tier = 'medium';
+
+  return { subject: s, score: riskScore, tier: tier, factors: factors };
+}
+
+function analyzeAcademicRisk() {
+  subjects = subjects || [];
+  var analyses = subjects.filter(Boolean).map(analyzeSubjectRisk);
+  analyses.sort(function(a, b) { return b.score - a.score; });
+  var overallGpa = calcOverallGPA();
+  var atRisk = analyses.filter(function(a) { return a.tier === 'critical' || a.tier === 'high'; });
+  var onTrack = analyses.filter(function(a) {
+    var gpa = getSubjectGpa(a.subject);
+    return gpa !== null && targetGPA > 0 && gpa >= targetGPA;
+  });
+
+  var semesterScore = 0;
+  if (analyses.length) {
+    semesterScore = Math.round(analyses.reduce(function(sum, a) { return sum + a.score; }, 0) / analyses.length);
+  }
+  if (overallGpa > 0 && overallGpa < 2.0) semesterScore = Math.max(semesterScore, 75);
+  else if (targetGPA > 0 && overallGpa > 0 && overallGpa < targetGPA - 0.4) semesterScore = Math.max(semesterScore, 55);
+
+  var semesterTier;
+  if (semesterScore >= 65) semesterTier = { label: 'Critical', class: 'risk-critical', icon: '🚨' };
+  else if (semesterScore >= 40) semesterTier = { label: 'High Risk', class: 'risk-high', icon: '⚠️' };
+  else if (semesterScore >= 20) semesterTier = { label: 'Caution', class: 'risk-medium', icon: '📋' };
+  else semesterTier = { label: 'Safe', class: 'risk-low', icon: '✅' };
+
+  return {
+    analyses: analyses,
+    atRiskCount: atRisk.length,
+    onTrackCount: onTrack.length,
+    semesterScore: semesterScore,
+    semesterTier: semesterTier,
+    overallGpa: overallGpa
+  };
+}
+
+function getRiskRecommendations(report) {
+  var recs = [];
+  if (!report.analyses.length) {
+    recs.push('Add subjects with marks to get personalized risk analysis.');
+    return recs;
+  }
+  if (report.atRiskCount > 0) {
+    recs.push('Prioritize ' + report.atRiskCount + ' high-risk subject(s) — check AI Study Priority in Timetable.');
+  }
+  if (targetGPA > 0 && report.overallGpa < targetGPA) {
+    recs.push('Semester GPA is below target — use Target GPA Predictor in Tools to plan finals.');
+  }
+  if (report.analyses.some(function(a) {
+    return a.factors.some(function(f) { return f.text.indexOf('Final') !== -1; });
+  })) {
+    recs.push('Enter or predict final exam marks for subjects in Post-Midterm stage.');
+  }
+  if (report.analyses.some(function(a) {
+    var ch = getChapterProgress(a.subject.chapters);
+    return ch && ch.pct < 50;
+  })) {
+    recs.push('Catch up on incomplete chapters — enable chapter tracking per subject.');
+  }
+  if (report.semesterTier.class === 'risk-low') {
+    recs.push('Keep maintaining your current study routine.');
+  }
+  return recs;
+}
+
+function renderRiskAnalyzer() {
+  var badge = document.getElementById('risk-semester-badge');
+  var statsRow = document.getElementById('risk-stats-row');
+  var list = document.getElementById('risk-subject-list');
+  var recBox = document.getElementById('risk-recommendations');
+  if (!badge || !statsRow || !list) return;
+
+  var report = analyzeAcademicRisk();
+  badge.className = 'risk-semester-badge ' + report.semesterTier.class;
+  badge.textContent = report.semesterTier.icon + ' ' + report.semesterTier.label;
+
+  statsRow.innerHTML =
+    '<div class="risk-stat"><div class="risk-stat-label">Risk Score</div><div class="risk-stat-value">' + report.semesterScore + '</div></div>' +
+    '<div class="risk-stat"><div class="risk-stat-label">At Risk</div><div class="risk-stat-value" style="color:var(--red);">' + report.atRiskCount + '</div></div>' +
+    '<div class="risk-stat"><div class="risk-stat-label">On Track</div><div class="risk-stat-value" style="color:var(--green);">' + report.onTrackCount + '</div></div>' +
+    '<div class="risk-stat"><div class="risk-stat-label">Current GPA</div><div class="risk-stat-value">' + report.overallGpa.toFixed(2) + '</div></div>';
+
+  if (!report.analyses.length) {
+    list.innerHTML = '<div class="predictor-empty">No subjects to analyze. Add subjects in the Subjects tab.</div>';
+  } else {
+    list.innerHTML = report.analyses.map(function(a) {
+      var tierLabel = a.tier.charAt(0).toUpperCase() + a.tier.slice(1);
+      return '<div class="risk-subject-item risk-' + a.tier + '">' +
+        '<div class="risk-subject-name">' + escapeHtml(a.subject.name) + ' <span style="font-size:12px;color:var(--text2);">(' + tierLabel + ' · ' + a.score + ')</span></div>' +
+        '<div class="risk-factor">' + a.factors.map(function(f) {
+          return '<span class="' + f.level + '">• ' + escapeHtml(f.text) + '</span>';
+        }).join('<br>') + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  var recs = getRiskRecommendations(report);
+  if (recBox && recs.length) {
+    recBox.style.display = '';
+    recBox.innerHTML = '<h4>💡 Recommendations</h4><ul>' + recs.map(function(r) {
+      return '<li>' + escapeHtml(r) + '</li>';
+    }).join('') + '</ul>';
+  } else if (recBox) {
+    recBox.style.display = 'none';
+  }
+
+  updateSubjectsSummary(report);
+}
+
+function updateSubjectsSummary(report) {
+  report = report || analyzeAcademicRisk();
+  var totalEl = document.getElementById('summary-total');
+  var avgEl = document.getElementById('summary-avg');
+  var riskEl = document.getElementById('summary-risk');
+  var trackEl = document.getElementById('summary-track');
+  if (totalEl) totalEl.textContent = (subjects || []).length;
+  if (avgEl) avgEl.textContent = report.overallGpa > 0 ? report.overallGpa.toFixed(2) : '—';
+  if (riskEl) riskEl.textContent = report.atRiskCount;
+  if (trackEl) trackEl.textContent = report.onTrackCount;
+}
+
 function parseJSON(str, fallback) {
   try { return JSON.parse(str); } catch(e) { return fallback; }
 }
@@ -1899,6 +2128,7 @@ function renderOverview() {
     document.getElementById('stat-strongest').textContent = '—';
     document.getElementById('stat-weakest').textContent = '—';
   }
+  updateSubjectsSummary();
 }
 
 // ============================================================
@@ -2611,6 +2841,7 @@ function renderStudyHeatmap() {
 }
 
 function renderCharts() {
+  renderRiskAnalyzer();
   var items = getAnalyticsSubjects();
   var labels = items.map(function(i) { return i.name; });
   var values = items.map(function(i) { return parseFloat(i.pct.toFixed(1)); });
