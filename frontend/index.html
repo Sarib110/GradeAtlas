@@ -267,11 +267,14 @@ select.input-field{cursor:pointer;}
 
       <!-- SUBJECTS TAB -->
       <div id="panel-subjects" class="tab-panel">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
           <div class="section-title">Your Subjects</div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button id="mode-absolute" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);">⚡ Absolute Mode</button>
-            <button id="mode-relative" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);">🎯 Relative Mode</button>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="mode-absolute" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);">⚡ Absolute Mode</button>
+              <button id="mode-relative" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);">🎯 Relative Mode</button>
+            </div>
+            <p id="abs-mode-helper" class="abs-mode-helper">Enter exact marks for each component — weights must total 100%.</p>
           </div>
         </div>
 
@@ -372,11 +375,33 @@ select.input-field{cursor:pointer;}
                 <input type="number" id="comp-final-total" class="input-field" min="1" value="100">
               </div>
             </div>
-            <div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-              <div><strong>Preview:</strong> <span id="abs-preview-pct">—</span></div>
-              <div><strong>GPA:</strong> <span id="abs-preview-gpa">—</span></div>
-              <div id="abs-warning" style="margin-left:12px;color:var(--amber);"></div>
-              <div id="stage-msg" style="margin-left:12px;color:var(--text2);"></div>
+            <div class="abs-preview-block" style="margin-top:12px;">
+              <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+                <div><strong>Preview:</strong> <span id="abs-preview-pct">—</span></div>
+                <div><strong>GPA:</strong> <span id="abs-preview-gpa" class="abs-gpa-display">—</span></div>
+              </div>
+              <div id="abs-gpa-hint" class="abs-gpa-hint"></div>
+              <div class="abs-target-row" style="margin-top:12px;">
+                <label class="form-label">Target GPA (for final prediction)</label>
+                <div class="abs-gpa-presets">
+                  <button type="button" class="btn btn-sm abs-preset" data-gpa="2.5">2.5</button>
+                  <button type="button" class="btn btn-sm abs-preset" data-gpa="3.0">3.0</button>
+                  <button type="button" class="btn btn-sm abs-preset" data-gpa="3.5">3.5</button>
+                  <button type="button" class="btn btn-sm abs-preset" data-gpa="4.0">4.0</button>
+                </div>
+                <div style="display:flex;gap:12px;align-items:flex-end;margin-top:8px;">
+                  <div style="flex:1;">
+                    <label class="form-label">GPA</label>
+                    <input type="range" id="abs-target-slider" min="0" max="4" step="0.1" value="3">
+                  </div>
+                  <div style="width:100px;">
+                    <label class="form-label">Selected GPA</label>
+                    <input type="number" id="abs-target-gpa" class="input-field abs-target-input" min="0" max="4" step="0.1" value="3.0">
+                  </div>
+                </div>
+              </div>
+              <div id="abs-warning" style="margin-top:10px;color:var(--amber);"></div>
+              <div id="stage-msg" style="margin-top:6px;color:var(--text2);"></div>
             </div>
           </div>
 
@@ -428,7 +453,28 @@ select.input-field{cursor:pointer;}
             /* Mode buttons (Absolute / Relative) */
           #mode-absolute, #mode-relative{background:#1a1a24;color:#9090aa;border:1px solid rgba(255,255,255,0.15);padding:8px 10px;border-radius:10px;font-weight:600}
           #mode-absolute:hover, #mode-relative:hover{background:#2a2a3a;color:#e6e6ff}
-          #panel-subjects .mode-active{background:#6c63ff;color:#ffffff;border:1px solid #6c63ff;box-shadow:0 6px 20px rgba(108,99,255,0.18);}
+          #mode-absolute.mode-active{background:#6c63ff;color:#ffffff;border:1px solid #6c63ff;box-shadow:0 6px 20px rgba(108,99,255,0.18);animation:glow 2.4s infinite;}
+          #mode-relative.mode-active{background:#6c63ff;color:#ffffff;border:1px solid #6c63ff;box-shadow:0 6px 20px rgba(108,99,255,0.18);}
+          .abs-mode-helper{font-size:12px;color:var(--text2);margin:0;text-align:right;max-width:340px;line-height:1.4;display:none;}
+          .abs-mode-helper.show{display:block;}
+          .abs-gpa-display{font-weight:700;padding:2px 8px;border-radius:8px;}
+          .abs-gpa-low{color:var(--red);background:rgba(239,68,68,0.12);}
+          .abs-gpa-mid{color:var(--amber);background:rgba(245,158,11,0.12);}
+          .abs-gpa-high{color:#38bdf8;background:rgba(56,189,248,0.12);}
+          .abs-gpa-hint{margin-top:8px;padding:8px 12px;border-radius:10px;font-size:13px;border:1px solid var(--border);background:var(--bg3);display:none;}
+          .abs-gpa-hint.show{display:block;}
+          .abs-gpa-hint.abs-gpa-low{color:var(--red);border-color:rgba(239,68,68,0.35);}
+          .abs-gpa-hint.abs-gpa-mid{color:var(--amber);border-color:rgba(245,158,11,0.35);}
+          .abs-gpa-hint.abs-gpa-high{color:#38bdf8;border-color:rgba(56,189,248,0.35);}
+          .abs-gpa-presets{display:flex;gap:8px;margin-bottom:4px;flex-wrap:wrap;}
+          .abs-preset{background:var(--bg3);color:var(--text);border:1px solid var(--border);min-width:48px;font-weight:600;}
+          .abs-preset:hover{border-color:var(--primary);color:var(--primary2);}
+          .abs-target-input.abs-gpa-low{border-color:var(--red);}
+          .abs-target-input.abs-gpa-mid{border-color:var(--amber);}
+          .abs-target-input.abs-gpa-high{border-color:#38bdf8;}
+          #abs-target-slider.abs-gpa-low{accent-color:var(--red);}
+          #abs-target-slider.abs-gpa-mid{accent-color:var(--amber);}
+          #abs-target-slider.abs-gpa-high{accent-color:#38bdf8;}
           /* Stage pills */
           .stage-pill{background:transparent;color:var(--text2);transition:all 0.18s;border-radius:999px;padding:8px 12px;}
           .stage-pill.selected{background:linear-gradient(90deg,var(--primary),var(--primary2));color:#fff;border-color:transparent;transform:translateY(-3px)}
@@ -454,9 +500,76 @@ select.input-field{cursor:pointer;}
             var stageComplete = document.getElementById('stage-complete');
             var finalBlock = document.getElementById('final-block');
             var stageMsg = document.getElementById('stage-msg');
+            var absModeHelper = document.getElementById('abs-mode-helper');
+            var absTargetSlider = document.getElementById('abs-target-slider');
+            var absTargetGpaInput = document.getElementById('abs-target-gpa');
+            var absGpaHint = document.getElementById('abs-gpa-hint');
+            var absTargetGpa = 3.0;
 
-            function setMode(m){ localStorage.setItem(MODE_KEY, m); if(m==='absolute'){ absBtn.classList.add('mode-active'); relBtn.classList.remove('mode-active'); absPanel.style.display=''; relPanel.style.display='none'; } else { relBtn.classList.add('mode-active'); absBtn.classList.remove('mode-active'); absPanel.style.display='none'; relPanel.style.display=''; } }
+            function gpaTone(g) {
+              if (g < 2) return 'low';
+              if (g < 3) return 'mid';
+              return 'high';
+            }
+
+            function applyGpaTone(el, tone) {
+              if (!el) return;
+              el.classList.remove('abs-gpa-low', 'abs-gpa-mid', 'abs-gpa-high');
+              el.classList.add('abs-gpa-' + tone);
+            }
+
+            function updateAbsTargetUi() {
+              var gpa = safeNum(absTargetGpaInput ? absTargetGpaInput.value : absTargetGpa, absTargetGpa);
+              gpa = Math.max(0, Math.min(4, gpa));
+              absTargetGpa = gpa;
+              if (absTargetSlider) absTargetSlider.value = gpa;
+              if (absTargetGpaInput) absTargetGpaInput.value = gpa.toFixed(1);
+              applyGpaTone(absTargetGpaInput, gpaTone(gpa));
+              applyGpaTone(absTargetSlider, gpaTone(gpa));
+              calcPreview();
+            }
+
+            function updateAbsPreviewUi(gpa, overall) {
+              if (!absPreviewGpa) return;
+              if (!isFinite(gpa)) {
+                absPreviewGpa.textContent = '—';
+                absPreviewGpa.classList.remove('abs-gpa-low', 'abs-gpa-mid', 'abs-gpa-high');
+                if (absGpaHint) {
+                  absGpaHint.classList.remove('show', 'abs-gpa-low', 'abs-gpa-mid', 'abs-gpa-high');
+                  absGpaHint.textContent = '';
+                }
+                return;
+              }
+              absPreviewGpa.textContent = gpa.toFixed(2);
+              var tone = gpaTone(gpa);
+              applyGpaTone(absPreviewGpa, tone);
+              if (absGpaHint) {
+                var grade = '—';
+                if (typeof pctToGrade === 'function') {
+                  var system = (document.getElementById('subject-system') || { value: 'pakistan' }).value;
+                  grade = pctToGrade(overall, system);
+                }
+                absGpaHint.classList.add('show');
+                applyGpaTone(absGpaHint, tone);
+                if (gpa >= 3) absGpaHint.textContent = 'You are on track for ' + grade + ' grade — keep it up!';
+                else if (gpa >= 2) absGpaHint.textContent = 'Average range (' + grade + ') — room to improve.';
+                else absGpaHint.textContent = 'At risk (' + grade + ') — focus needed.';
+              }
+            }
+
+            function setMode(m){ localStorage.setItem(MODE_KEY, m); if(m==='absolute'){ absBtn.classList.add('mode-active'); relBtn.classList.remove('mode-active'); absPanel.style.display=''; relPanel.style.display='none'; if(absModeHelper) absModeHelper.classList.add('show'); } else { relBtn.classList.add('mode-active'); absBtn.classList.remove('mode-active'); absPanel.style.display='none'; relPanel.style.display=''; if(absModeHelper) absModeHelper.classList.remove('show'); } }
             absBtn.addEventListener('click', function(){ setMode('absolute'); }); relBtn.addEventListener('click', function(){ setMode('relative'); }); var saved = localStorage.getItem(MODE_KEY) || 'absolute'; setMode(saved);
+
+            if (absTargetSlider) absTargetSlider.addEventListener('input', function(){ if(absTargetGpaInput) absTargetGpaInput.value = absTargetSlider.value; updateAbsTargetUi(); });
+            if (absTargetGpaInput) absTargetGpaInput.addEventListener('input', function(){ if(absTargetSlider) absTargetSlider.value = absTargetGpaInput.value; updateAbsTargetUi(); });
+            document.querySelectorAll('.abs-preset').forEach(function(btn){
+              btn.addEventListener('click', function(){
+                var v = safeNum(btn.getAttribute('data-gpa'), 3);
+                if(absTargetSlider) absTargetSlider.value = v;
+                if(absTargetGpaInput) absTargetGpaInput.value = v.toFixed(1);
+                updateAbsTargetUi();
+              });
+            });
 
             function setStage(s){ localStorage.setItem(STAGE_KEY, s); [stageMid,stagePost,stageComplete].forEach(function(el){ if(!el) return; el.classList.remove('selected'); }); if(s==='mid-semester'){ stageMid.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='0'; if(stageMsg) stageMsg.textContent = "Final exam not yet — we'll predict your target!"; } else if(s==='post-midterm'){ stagePost.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='1'; if(stageMsg) stageMsg.textContent = "Finals approaching — final marks optional (leave blank to predict)."; } else { stageComplete.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='1'; if(stageMsg) stageMsg.textContent = "Semester complete — enter all marks to compute final GPA."; } }
             stageMid.addEventListener('click', function(){ setStage('mid-semester'); }); stagePost.addEventListener('click', function(){ setStage('post-midterm'); }); stageComplete.addEventListener('click', function(){ setStage('complete'); });
@@ -527,7 +640,7 @@ select.input-field{cursor:pointer;}
 
             function targetPercentFromGPA(gpa){ if(gpa >= 4.0) return 85; if(gpa >= 3.7) return 80; if(gpa >= 3.3) return 75; if(gpa >= 3.0) return 71; if(gpa >= 2.7) return 68; if(gpa >= 2.3) return 64; if(gpa >= 2.0) return 61; if(gpa >= 1.7) return 58; if(gpa >= 1.3) return 54; if(gpa >= 1.0) return 50; return null; }
 
-            function resetAbsoluteDefaults(){ if(wMid) wMid.value='30'; if(midObt) midObt.value=''; if(midTot) midTot.value='50'; if(wAss) wAss.value='20'; if(assCount) assCount.value='1'; if(wQuiz) wQuiz.value='10'; if(quizCount) quizCount.value='1'; if(wProject) wProject.value='0'; if(projectCount) projectCount.value='1'; if(projectPanel) projectPanel.style.display='none'; if(wFin) wFin.value='40'; if(finObt) finObt.value=''; if(finTot) finTot.value='100'; if(assignmentsList) buildAssignmentRows(1); if(quizzesList) buildQuizRows(1); if(projectsList) projectsList.innerHTML=''; if(absPreviewPct) absPreviewPct.textContent='—'; if(absPreviewGpa) absPreviewGpa.textContent='—'; if(absWarning){ absWarning.textContent=''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; } if(weightsStatus){ weightsStatus.textContent='✅ Weights OK'; weightsStatus.style.color='var(--green)'; } }
+            function resetAbsoluteDefaults(){ if(wMid) wMid.value='30'; if(midObt) midObt.value=''; if(midTot) midTot.value='50'; if(wAss) wAss.value='20'; if(assCount) assCount.value='1'; if(wQuiz) wQuiz.value='10'; if(quizCount) quizCount.value='1'; if(wProject) wProject.value='0'; if(projectCount) projectCount.value='1'; if(projectPanel) projectPanel.style.display='none'; if(wFin) wFin.value='40'; if(finObt) finObt.value=''; if(finTot) finTot.value='100'; if(assignmentsList) buildAssignmentRows(1); if(quizzesList) buildQuizRows(1); if(projectsList) projectsList.innerHTML=''; if(absPreviewPct) absPreviewPct.textContent='—'; if(absPreviewGpa) absPreviewGpa.textContent='—'; updateAbsPreviewUi(null, 0); absTargetGpa = 3; if(absTargetSlider) absTargetSlider.value = 3; if(absTargetGpaInput) absTargetGpaInput.value = '3.0'; applyGpaTone(absTargetGpaInput, 'mid'); applyGpaTone(absTargetSlider, 'mid'); if(absWarning){ absWarning.textContent=''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; } if(weightsStatus){ weightsStatus.textContent='✅ Weights OK'; weightsStatus.style.color='var(--green)'; } }
 
             function clampCount(input, min, max){ if(!input) return; var v = parseInt(input.value, 10); if(isNaN(v)) v = min; v = Math.max(min, Math.min(max, v)); if(input.value != v) input.value = v; return v; }
 
@@ -559,7 +672,8 @@ select.input-field{cursor:pointer;}
 
               var overall = totalWeight ? weighted : 0;
               absPreviewPct.textContent = totalWeight ? overall.toFixed(1) + '%' : '—';
-              try { var g = pctToGPA(overall, document.getElementById('subject-system').value); absPreviewGpa.textContent = isFinite(g) ? g.toFixed(2) : '—'; } catch(e){ absPreviewGpa.textContent = '—'; }
+              var g = null;
+              try { g = pctToGPA(overall, document.getElementById('subject-system').value); updateAbsPreviewUi(isFinite(g) ? g : null, overall); } catch(e){ if(absPreviewGpa) absPreviewGpa.textContent = '—'; updateAbsPreviewUi(null, overall); }
 
               var stage = localStorage.getItem(STAGE_KEY) || 'mid-semester';
               if(stage === 'mid-semester'){
@@ -569,7 +683,7 @@ select.input-field{cursor:pointer;}
                 if(finalBlock) finalBlock.style.display='block';
                 if(finObt && String(finObt.value).trim() === ''){
                   if(absWarning){ absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; }
-                  var targetPct = targetPercentFromGPA(typeof targetGPA === 'number' ? targetGPA : parseFloat(targetGPA));
+                  var targetPct = targetPercentFromGPA(absTargetGpa);
                   if(targetPct !== null && e > 0){
                     var currentScore = 0;
                     if(midPct !== null) currentScore += midPct * (a / 100);
