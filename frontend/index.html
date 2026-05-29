@@ -707,6 +707,7 @@ select.input-field{cursor:pointer;}
             function clampCount(input, min, max){ if(!input) return; var v = parseInt(input.value, 10); if(isNaN(v)) v = min; v = Math.max(min, Math.min(max, v)); if(input.value != v) input.value = v; return v; }
 
             function calcPreview(){
+              var currentMode = localStorage.getItem(MODE_KEY) || 'absolute';
               var a = safeNum(wMid.value,0);
               var b = safeNum(wAss.value,0);
               var c = safeNum(wQuiz.value,0);
@@ -724,6 +725,19 @@ select.input-field{cursor:pointer;}
               var quizSummary = getRowsSummary(quizzesList, {obt:'quiz-obt', tot:'quiz-total', label:'Q'});
               var projectSummary = getRowsSummary(projectsList, {obt:'project-obt', tot:'project-total', name:'project-name', label:'P'});
               var finPct = (finObt && finTot) ? getNumericPct(finObt, finTot) : null;
+
+              // Apply relative grading if in relative mode
+              if(currentMode === 'relative'){
+                var midClassAvg = safeNum(document.getElementById('comp-mid-classavg').value, null);
+                var assClassAvg = safeNum(document.getElementById('comp-assn-classavg').value, null);
+                var quizClassAvg = safeNum(document.getElementById('comp-quiz-classavg').value, null);
+                var projClassAvg = safeNum(document.getElementById('comp-project-classavg').value, null);
+                
+                if(midPct !== null && midClassAvg > 0) midPct = Math.min(100, (midPct / midClassAvg) * 100);
+                if(assSummary.avg !== null && assClassAvg > 0) assSummary.avg = Math.min(100, (assSummary.avg / assClassAvg) * 100);
+                if(quizSummary.avg !== null && quizClassAvg > 0) quizSummary.avg = Math.min(100, (quizSummary.avg / quizClassAvg) * 100);
+                if(projectSummary.avg !== null && projClassAvg > 0) projectSummary.avg = Math.min(100, (projectSummary.avg / projClassAvg) * 100);
+              }
 
               var weighted = 0;
               if(midPct !== null) weighted += midPct * (a / 100);
@@ -753,10 +767,21 @@ select.input-field{cursor:pointer;}
                     if(quizSummary.avg !== null) currentScore += quizSummary.avg * (c / 100);
                     if(projectSummary.avg !== null) currentScore += projectSummary.avg * (d / 100);
                     var neededFinal = ((targetPct - currentScore) / (e / 100));
+                    
+                    // For relative mode, show what you need to score (accounting for class average)
+                    var displayText = '';
+                    if(currentMode === 'relative'){
+                      var finClassAvg = safeNum(document.getElementById('comp-final-classavg').value, null);
+                      if(finClassAvg > 0){
+                        var rawNeeded = (neededFinal * finClassAvg) / 100; // Convert back to raw score
+                        displayText = ' (raw: '+rawNeeded.toFixed(0)+'% if class avg is '+finClassAvg+'%)';
+                      }
+                    }
+                    
                     if(neededFinal <= 0){ absWarning.textContent = '🎉 Target GPA already secured! Final is bonus!'; absWarning.style.color='var(--green)'; }
-                    else if(neededFinal <= 50){ absWarning.textContent = '✅ Easy! Need '+neededFinal.toFixed(0)+'% in Final'; absWarning.style.color='var(--green)'; }
-                    else if(neededFinal <= 75){ absWarning.textContent = '📈 Need '+neededFinal.toFixed(0)+'% in Final — achievable!'; absWarning.style.color='var(--amber)'; }
-                    else if(neededFinal <= 100){ absWarning.textContent = '⚠️ Need '+neededFinal.toFixed(0)+'% in Final — study hard!'; absWarning.style.color='orange'; }
+                    else if(neededFinal <= 50){ absWarning.textContent = '✅ Easy! Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final'; absWarning.style.color='var(--green)'; }
+                    else if(neededFinal <= 75){ absWarning.textContent = '📈 Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final — achievable!'; absWarning.style.color='var(--amber)'; }
+                    else if(neededFinal <= 100){ absWarning.textContent = '⚠️ Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final — study hard!'; absWarning.style.color='orange'; }
                     else { absWarning.textContent = '🚨 Target impossible even with 100% in Final!'; absWarning.style.color='red'; absWarning.classList.add('pulse-warning'); absWarning.style.animation='pulse 1.2s ease-in-out infinite'; }
                   } else { if(absWarning) absWarning.textContent = ''; }
                 } else { if(absWarning) absWarning.textContent = ''; }
@@ -779,6 +804,18 @@ select.input-field{cursor:pointer;}
             if(assignmentsList) assignmentsList.addEventListener('input', calcPreview);
             if(quizzesList) quizzesList.addEventListener('input', calcPreview);
             if(projectsList) projectsList.addEventListener('input', calcPreview);
+            
+            // Class average fields for relative mode
+            var midClassAvgEl = document.getElementById('comp-mid-classavg');
+            var assClassAvgEl = document.getElementById('comp-assn-classavg');
+            var quizClassAvgEl = document.getElementById('comp-quiz-classavg');
+            var projClassAvgEl = document.getElementById('comp-project-classavg');
+            var finClassAvgEl = document.getElementById('comp-final-classavg');
+            if(midClassAvgEl) midClassAvgEl.addEventListener('input', calcPreview);
+            if(assClassAvgEl) assClassAvgEl.addEventListener('input', calcPreview);
+            if(quizClassAvgEl) quizClassAvgEl.addEventListener('input', calcPreview);
+            if(projClassAvgEl) projClassAvgEl.addEventListener('input', calcPreview);
+            if(finClassAvgEl) finClassAvgEl.addEventListener('input', calcPreview);
 
             window.populateSubjectFormFromRecord = function(s) {
               if (!s) return;
