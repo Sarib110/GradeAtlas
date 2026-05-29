@@ -136,6 +136,23 @@ select.input-field{cursor:pointer;}
 .tool-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
 .tool-result{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:12px;font-size:14px;display:none;line-height:1.8;}
 .tool-result.show{display:block;}
+.predictor-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:14px 0;}
+.predictor-stat{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;text-align:center;}
+.predictor-stat-label{font-size:11px;color:var(--text2);margin-bottom:4px;}
+.predictor-stat-value{font-size:20px;font-weight:700;}
+.predictor-list{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
+.predictor-row{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+.predictor-row-name{font-weight:700;font-size:14px;}
+.predictor-row-meta{font-size:12px;color:var(--text2);margin-top:4px;}
+.predictor-row-result{text-align:right;font-size:13px;max-width:280px;}
+.predictor-status-easy{color:var(--green);}
+.predictor-status-achievable{color:var(--amber);}
+.predictor-status-hard{color:orange;}
+.predictor-status-impossible{color:var(--red);}
+.predictor-status-secured{color:var(--green);}
+.predictor-status-done{color:var(--text2);}
+.predictor-empty{text-align:center;padding:24px;color:var(--text2);}
+.predictor-presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
 .countdown-display{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--primary2);padding:14px 0;text-align:center;}
 .tt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:16px;}
 .tt-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;transition:border-color 0.2s;}
@@ -1011,6 +1028,22 @@ select.input-field{cursor:pointer;}
           <div id="calc-result" class="tool-result"></div>
         </div>
         <div class="tool-card">
+          <div class="section-title" style="font-size:15px;">🎯 Target GPA Predictor</div>
+          <p style="font-size:13px;color:var(--text2);margin:0 0 12px;">See how much you need in each final exam to hit your target GPA across all subjects.</p>
+          <label class="form-label">Target GPA</label>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+            <input type="number" id="predictor-target-gpa" class="input-field" placeholder="e.g. 3.5" step="0.1" min="0" max="4" style="flex:1;min-width:120px;">
+            <button class="btn btn-primary" id="predictor-run-btn">Predict</button>
+          </div>
+          <div class="predictor-presets">
+            <button type="button" class="btn btn-sm predictor-preset" data-gpa="2.5">2.5</button>
+            <button type="button" class="btn btn-sm predictor-preset" data-gpa="3.0">3.0</button>
+            <button type="button" class="btn btn-sm predictor-preset" data-gpa="3.5">3.5</button>
+            <button type="button" class="btn btn-sm predictor-preset" data-gpa="4.0">4.0</button>
+          </div>
+          <div id="predictor-output" class="tool-result"></div>
+        </div>
+        <div class="tool-card">
           <div class="section-title" style="font-size:15px;">⏰ Exam Countdown</div>
           <label class="form-label">Exam Name</label>
           <input type="text" id="exam-name" class="input-field" placeholder="e.g. Final Exams">
@@ -1104,6 +1137,214 @@ function getSubjectPct(s) {
   return any ? weighted : null;
 }
 
+function targetPercentFromGPA(gpa) {
+  if (gpa >= 4.0) return 85;
+  if (gpa >= 3.7) return 80;
+  if (gpa >= 3.3) return 75;
+  if (gpa >= 3.0) return 71;
+  if (gpa >= 2.7) return 68;
+  if (gpa >= 2.3) return 64;
+  if (gpa >= 2.0) return 61;
+  if (gpa >= 1.7) return 58;
+  if (gpa >= 1.3) return 54;
+  if (gpa >= 1.0) return 50;
+  return null;
+}
+
+function getComponentRawPct(c) {
+  if (!c || c.obtained === null || c.obtained === undefined) return null;
+  var tot = safeFloat(c.total, 100);
+  if (tot <= 0) return null;
+  return (safeFloat(c.obtained, 0) / tot) * 100;
+}
+
+function getComponentEffectivePct(c, mode) {
+  var raw = getComponentRawPct(c);
+  if (raw === null) return null;
+  if (mode === 'relative') {
+    var classAvg = safeFloat(c.classAvg, null);
+    if (classAvg > 0) return Math.min(100, (raw / classAvg) * 100);
+  }
+  return raw;
+}
+
+function getSubjectGpa(s) {
+  if (!s) return null;
+  if (s.gpa != null && s.gpa !== '') return safeFloat(s.gpa, null);
+  var pct = getSubjectPct(s);
+  if (pct !== null) return pctToGPA(pct, s.system || 'pakistan');
+  return null;
+}
+
+function getSubjectCurrentScoreExcludingFinal(s) {
+  var comp = s.components || {};
+  var mode = s.mode === 'relative' ? 'relative' : 'absolute';
+  var score = 0;
+  var hasAny = false;
+  ['midterm', 'assignment', 'quiz', 'project'].forEach(function(key) {
+    var c = comp[key];
+    if (!c || safeFloat(c.weight, 0) <= 0) return;
+    var pct = getComponentEffectivePct(c, mode);
+    if (pct !== null) {
+      score += pct * (safeFloat(c.weight, 0) / 100);
+      hasAny = true;
+    }
+  });
+  return hasAny ? score : 0;
+}
+
+function predictFinalForSubject(s, targetGpaVal) {
+  if (!s || !targetGpaVal || targetGpaVal <= 0) return null;
+  var comp = s.components || {};
+  var fin = comp.final;
+  var finalWeight = fin ? safeFloat(fin.weight, 0) : 0;
+  if (!fin || finalWeight <= 0) {
+    return { status: 'no-final', message: 'No final exam configured' };
+  }
+  if (fin.obtained !== null && fin.obtained !== undefined && fin.obtained !== '') {
+    return { status: 'done', message: 'Final marks already entered' };
+  }
+  if (fin.hidden) {
+    return { status: 'hidden', message: 'Mid-semester — final not applicable yet' };
+  }
+  var mode = s.mode === 'relative' ? 'relative' : 'absolute';
+  var targetPct = targetPercentFromGPA(targetGpaVal);
+  if (targetPct === null) return { status: 'invalid', message: 'Invalid target GPA' };
+
+  var currentScore = getSubjectCurrentScoreExcludingFinal(s);
+  var neededFinal = (targetPct - currentScore) / (finalWeight / 100);
+  var rawHint = '';
+  if (mode === 'relative') {
+    var finClassAvg = safeFloat(fin.classAvg, null);
+    if (finClassAvg > 0 && neededFinal > 0) {
+      var rawNeeded = (neededFinal * finClassAvg) / 100;
+      rawHint = ' (raw: ' + Math.ceil(rawNeeded) + '% if class avg is ' + finClassAvg + '%)';
+    }
+  }
+
+  if (neededFinal <= 0) {
+    return { status: 'secured', message: 'Target already secured!', needed: 0, currentScore: currentScore };
+  }
+  if (neededFinal > 100) {
+    return { status: 'impossible', message: 'Impossible even with 100% in Final', needed: neededFinal, currentScore: currentScore };
+  }
+  var msg = 'Need ' + Math.ceil(neededFinal) + '%' + rawHint + ' in Final';
+  if (neededFinal <= 50) return { status: 'easy', message: msg, needed: neededFinal, currentScore: currentScore };
+  if (neededFinal <= 75) return { status: 'achievable', message: msg, needed: neededFinal, currentScore: currentScore };
+  return { status: 'hard', message: msg, needed: neededFinal, currentScore: currentScore };
+}
+
+function calcSubjectPctWithFinal(s, finalEffectivePct) {
+  var comp = s.components || {};
+  var mode = s.mode === 'relative' ? 'relative' : 'absolute';
+  var fin = comp.final;
+  var score = getSubjectCurrentScoreExcludingFinal(s);
+  if (fin && safeFloat(fin.weight, 0) > 0 && finalEffectivePct !== null) {
+    score += finalEffectivePct * (safeFloat(fin.weight, 0) / 100);
+  } else {
+    var finPct = getComponentEffectivePct(fin, mode);
+    if (finPct !== null) score += finPct * (safeFloat(fin.weight, 0) / 100);
+  }
+  return score;
+}
+
+function calcProjectedGPA(targetGpaVal) {
+  subjects = subjects || [];
+  var totalPts = 0, totalCr = 0;
+  subjects.forEach(function(s) {
+    if (!s) return;
+    var cr = safeFloat(s.credits, 3);
+    var pred = predictFinalForSubject(s, targetGpaVal);
+    var pct;
+    if (pred && (pred.status === 'easy' || pred.status === 'achievable' || pred.status === 'hard')) {
+      pct = calcSubjectPctWithFinal(s, Math.min(100, pred.needed));
+    } else if (pred && pred.status === 'secured') {
+      pct = pred.currentScore;
+    } else {
+      pct = getSubjectPct(s);
+    }
+    if (pct !== null) {
+      totalPts += pctToGPA(pct, s.system || 'pakistan') * cr;
+      totalCr += cr;
+    } else {
+      var gpa = getSubjectGpa(s);
+      if (gpa !== null) {
+        totalPts += gpa * cr;
+        totalCr += cr;
+      }
+    }
+  });
+  return totalCr ? totalPts / totalCr : 0;
+}
+
+function renderPredictor() {
+  var output = document.getElementById('predictor-output');
+  var input = document.getElementById('predictor-target-gpa');
+  if (!output) return;
+
+  var goal = safeFloat(input ? input.value : null, null);
+  if (goal === null || goal <= 0) goal = targetGPA > 0 ? targetGPA : null;
+  if (input && goal !== null && !input.value) input.value = goal.toFixed(1);
+
+  subjects = subjects || [];
+  if (!subjects.length) {
+    output.className = 'tool-result show';
+    output.innerHTML = '<div class="predictor-empty">📚 Add subjects first to see predictions.</div>';
+    return;
+  }
+  if (goal === null || goal <= 0) {
+    output.className = 'tool-result show';
+    output.innerHTML = '<div class="predictor-empty">Set a target GPA above and click Predict.</div>';
+    return;
+  }
+
+  var currentGpa = calcOverallGPA();
+  var projectedGpa = calcProjectedGPA(goal);
+  var rows = [];
+  var pendingCount = 0;
+  var impossibleCount = 0;
+
+  subjects.forEach(function(s) {
+    if (!s) return;
+    var pred = predictFinalForSubject(s, goal);
+    var subGpa = getSubjectGpa(s);
+    var statusClass = 'predictor-status-done';
+    if (pred) {
+      if (pred.status === 'easy') statusClass = 'predictor-status-easy';
+      else if (pred.status === 'achievable') statusClass = 'predictor-status-achievable';
+      else if (pred.status === 'hard') statusClass = 'predictor-status-hard';
+      else if (pred.status === 'impossible') statusClass = 'predictor-status-impossible';
+      else if (pred.status === 'secured') statusClass = 'predictor-status-secured';
+      if (pred.status === 'easy' || pred.status === 'achievable' || pred.status === 'hard') pendingCount++;
+      if (pred.status === 'impossible') impossibleCount++;
+    }
+    var modeLabel = s.mode === 'relative' ? 'Relative' : 'Absolute';
+    var gpaText = subGpa !== null ? subGpa.toFixed(2) : '—';
+    rows.push(
+      '<div class="predictor-row">' +
+        '<div><div class="predictor-row-name">' + escapeHtml(s.name) + '</div>' +
+        '<div class="predictor-row-meta">' + modeLabel + ' • ' + safeFloat(s.credits, 3) + ' cr • Current GPA: ' + gpaText + '</div></div>' +
+        '<div class="predictor-row-result ' + statusClass + '">' + escapeHtml(pred ? pred.message : '—') + '</div>' +
+      '</div>'
+    );
+  });
+
+  var gap = goal - currentGpa;
+  var gapText = gap > 0 ? gap.toFixed(2) + ' below target' : gap < 0 ? Math.abs(gap).toFixed(2) + ' above target' : 'On target';
+
+  output.className = 'tool-result show';
+  output.innerHTML =
+    '<div class="predictor-summary">' +
+      '<div class="predictor-stat"><div class="predictor-stat-label">Current GPA</div><div class="predictor-stat-value">' + currentGpa.toFixed(2) + '</div></div>' +
+      '<div class="predictor-stat"><div class="predictor-stat-label">Target GPA</div><div class="predictor-stat-value">' + goal.toFixed(2) + '</div></div>' +
+      '<div class="predictor-stat"><div class="predictor-stat-label">Projected GPA</div><div class="predictor-stat-value">' + projectedGpa.toFixed(2) + '</div></div>' +
+      '<div class="predictor-stat"><div class="predictor-stat-label">Gap</div><div class="predictor-stat-value" style="font-size:14px;">' + gapText + '</div></div>' +
+    '</div>' +
+    (pendingCount ? '<p style="font-size:13px;color:var(--text2);margin:0 0 8px;">' + pendingCount + ' subject(s) need final marks. Projected GPA assumes you hit the required finals.</p>' : '') +
+    (impossibleCount ? '<p style="font-size:13px;color:var(--red);margin:0 0 8px;">⚠️ ' + impossibleCount + ' subject(s) cannot reach target even with 100% in finals.</p>' : '') +
+    '<div class="predictor-list">' + rows.join('') + '</div>';
+}
+
 function parseJSON(str, fallback) {
   try { return JSON.parse(str); } catch(e) { return fallback; }
 }
@@ -1186,6 +1427,7 @@ function switchTab(name) {
   if (panel) panel.classList.add('active');
   document.querySelectorAll('[data-tab="' + name + '"]').forEach(function(b) { b.classList.add('active'); });
   if (name === 'analytics') renderCharts();
+  if (name === 'tools') renderPredictor();
 }
 
 document.querySelectorAll('.sidebar-item, .bnav-item').forEach(function(btn) {
@@ -2280,8 +2522,37 @@ document.getElementById('set-target-btn').addEventListener('click', function() {
   targetGPA = val;
   saveData();
   renderOverview();
+  var predInput = document.getElementById('predictor-target-gpa');
+  if (predInput) predInput.value = val.toFixed(1);
+  renderPredictor();
   showToast('Target GPA set to ' + val.toFixed(2) + '! 🎯', 'success');
   document.getElementById('target-gpa-input').value = '';
+});
+
+var predictorRunBtn = document.getElementById('predictor-run-btn');
+if (predictorRunBtn) {
+  predictorRunBtn.addEventListener('click', function() {
+    var val = safeFloat(document.getElementById('predictor-target-gpa').value, null);
+    if (val === null || val < 0 || val > 4) {
+      showPopup('⚠️', 'Invalid GPA', 'Please enter a GPA between 0.0 and 4.0.');
+      return;
+    }
+    targetGPA = val;
+    saveData();
+    renderOverview();
+    renderPredictor();
+  });
+}
+document.querySelectorAll('.predictor-preset').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var v = safeFloat(btn.getAttribute('data-gpa'), 3);
+    var predInput = document.getElementById('predictor-target-gpa');
+    if (predInput) predInput.value = v.toFixed(1);
+    targetGPA = v;
+    saveData();
+    renderOverview();
+    renderPredictor();
+  });
 });
 
 // ============================================================
