@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GradeAtlas – Smart Grade Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0a0a0f; --bg2:#111118; --bg3:#1a1a24; --card:#16161f;
+  --border:rgba(255,255,255,0.07); --primary:#6c63ff; --primary2:#8b85ff;
+  --green:#22c55e; --red:#ef4444; --amber:#f59e0b;
+  --text:#f0f0f8; --text2:#9090aa; --text3:#5a5a72;
+  --radius:16px; --radius-sm:10px; --shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden;font-size:15px;}
+.screen{display:none;min-height:100vh;}
+.screen.active{display:flex;flex-direction:column;}
+#login-screen,#register-screen{align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 20%,rgba(108,99,255,0.15) 0%,transparent 60%),var(--bg);padding:20px;}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:40px 36px;width:100%;max-width:420px;box-shadow:var(--shadow);animation:slideUp 0.4s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.auth-logo{text-align:center;margin-bottom:28px;}
+.auth-logo .logo-icon{font-size:42px;display:block;margin-bottom:12px;}
+.auth-logo h1{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;background:linear-gradient(135deg,#fff 0%,var(--primary2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.auth-logo p{color:var(--text2);font-size:13px;margin-top:4px;}
+.form-group{margin-bottom:16px;}
+.form-group label{display:block;font-size:13px;font-weight:500;color:var(--text2);margin-bottom:6px;}
+.form-group input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;transition:border-color 0.2s;outline:none;}
+.form-group input:focus{border-color:var(--primary);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 20px;border-radius:var(--radius-sm);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;outline:none;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover{background:var(--primary2);transform:translateY(-1px);}
+.btn-full{width:100%;padding:13px;font-size:15px;margin-top:8px;}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--bg3);color:var(--text);}
+.btn-danger{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);}
+.btn-danger:hover{background:rgba(239,68,68,0.25);}
+.btn-success{background:rgba(34,197,94,0.15);color:var(--green);border:1px solid rgba(34,197,94,0.3);}
+.btn-sm{padding:7px 14px;font-size:13px;}
+.auth-footer{text-align:center;margin-top:20px;font-size:13px;color:var(--text2);}
+.auth-footer a{color:var(--primary2);text-decoration:none;font-weight:500;cursor:pointer;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:rgba(10,10,15,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;gap:12px;}
+.topbar-brand{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;background:linear-gradient(135deg,#fff,var(--primary2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.user-badge{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:13px;color:var(--text2);}
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(17,17,24,0.97);backdrop-filter:blur(12px);border-top:1px solid var(--border);z-index:200;padding:8px 0 12px;}
+.bottom-nav-inner{display:flex;justify-content:space-around;}
+.bnav-item{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 16px;cursor:pointer;border-radius:10px;color:var(--text3);border:none;background:none;font-family:'DM Sans',sans-serif;transition:all 0.2s;}
+.bnav-item.active{color:var(--primary2);}
+.bnav-icon{font-size:20px;}
+.bnav-label{font-size:10px;font-weight:600;}
+.dash-layout{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:190px;background:var(--bg2);border-right:1px solid var(--border);padding:16px 10px;display:flex;flex-direction:column;gap:4px;flex-shrink:0;}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:14px;font-weight:500;transition:all 0.2s;border:none;background:none;font-family:'DM Sans',sans-serif;width:100%;text-align:left;outline:none;}
+.sidebar-item:hover{background:var(--bg3);color:var(--text);}
+.sidebar-item.active{background:rgba(108,99,255,0.15);color:var(--primary2);}
+.main-content{flex:1;overflow-y:auto;padding:24px;padding-bottom:80px;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;animation:fadeIn 0.3s ease;}
+.section-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:16px;}
+.gpa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+.gpa-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center;}
+.gpa-card-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:8px;}
+.gpa-number{font-family:'Syne',sans-serif;font-size:36px;font-weight:800;line-height:1;margin-bottom:8px;}
+.gpa-number.good{color:var(--green);}
+.gpa-number.warn{color:var(--amber);}
+.gpa-number.bad{color:var(--red);}
+.gpa-number.neutral{color:var(--text);}
+.gpa-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;}
+.badge-excellent{background:rgba(34,197,94,0.15);color:var(--green);}
+.badge-good{background:rgba(108,99,255,0.15);color:var(--primary2);}
+.badge-average{background:rgba(245,158,11,0.15);color:var(--amber);}
+.badge-poor{background:rgba(239,68,68,0.15);color:var(--red);}
+.progress-bar{background:var(--bg3);border-radius:99px;height:8px;margin:10px 0 6px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--primary),var(--green));transition:width 0.6s ease;}
+.progress-label{font-size:12px;color:var(--text2);}
+.target-row{display:flex;gap:8px;align-items:center;margin-top:10px;}
+.target-row input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;}
+.target-row input:focus{border-color:var(--primary);}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+.stat-label{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;}
+.stat-value{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.input-field{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;margin-bottom:10px;}
+.input-field:focus{border-color:var(--primary);}
+select.input-field{cursor:pointer;}
+.add-form{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.form-label{font-size:12px;color:var(--text2);margin-bottom:4px;display:block;font-weight:500;}
+.edit-mode-notice{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;color:var(--amber);margin-bottom:12px;display:none;align-items:center;gap:8px;}
+.edit-mode-notice.show{display:flex;}
+.subject-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:16px;}
+.subject-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;position:relative;transition:border-color 0.2s;}
+.subject-card:hover{border-color:rgba(108,99,255,0.3);}
+.subject-card-name{font-weight:700;font-size:15px;margin-bottom:4px;}
+.subject-card-pct{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;margin-bottom:4px;}
+.subject-card-meta{font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6;}
+.subject-card-actions{display:flex;gap:8px;}
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:20px;}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.chart-card h3{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.8px;}
+.chart-card canvas{max-height:220px;}
+.tool-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+.tool-result{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-top:12px;font-size:14px;display:none;line-height:1.8;}
+.tool-result.show{display:block;}
+.countdown-display{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--primary2);padding:14px 0;text-align:center;}
+.tt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:16px;}
+.tt-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;position:relative;transition:border-color 0.2s;}
+.tt-card:hover{border-color:rgba(108,99,255,0.3);}
+.tt-card-day{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--primary2);margin-bottom:6px;}
+.tt-card-subject{font-size:16px;font-weight:700;margin-bottom:4px;}
+.tt-card-time{font-size:13px;color:var(--text2);margin-bottom:12px;}
+.tt-card-actions{display:flex;gap:8px;}
+/* POPUP */
+.popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:600;align-items:center;justify-content:center;padding:20px;}
+.popup-overlay.active{display:flex;}
+.popup-box{background:var(--card);border:1px solid var(--border);border-radius:24px;padding:32px;text-align:center;max-width:360px;width:100%;animation:slideUp 0.3s ease;}
+.popup-icon{font-size:52px;margin-bottom:14px;}
+.popup-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:8px;}
+.popup-msg{color:var(--text2);font-size:14px;margin-bottom:22px;line-height:1.6;}
+.popup-btns{display:flex;gap:10px;justify-content:center;}
+.popup-btn-ok{padding:11px 32px;border-radius:var(--radius-sm);font-weight:600;font-size:14px;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;background:var(--primary);color:#fff;outline:none;}
+.popup-btn-ok:hover{background:var(--primary2);}
+.popup-btn-cancel{padding:11px 20px;border-radius:var(--radius-sm);font-weight:500;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--bg3);color:var(--text2);border:1px solid var(--border);outline:none;}
+.popup-btn-cancel:hover{background:var(--bg2);}
+/* TOAST */
+.toast-container{position:fixed;bottom:80px;right:16px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.toast{padding:12px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;max-width:280px;opacity:0;transform:translateX(20px);transition:all 0.3s ease;pointer-events:auto;}
+.toast.show{opacity:1;transform:none;}
+.toast-success{background:#166534;color:#86efac;border:1px solid #22c55e44;}
+.toast-danger{background:#7f1d1d;color:#fca5a5;border:1px solid #ef444444;}
+.toast-info{background:#1e1b4b;color:#a5b4fc;border:1px solid #6c63ff44;}
+.toast-warning{background:#78350f;color:#fcd34d;border:1px solid #f59e0b44;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty-state div{font-size:40px;margin-bottom:12px;}
+.empty-state p{font-size:14px;}
+.section-mb{margin-bottom:24px;}
+@media(max-width:768px){
+  .sidebar{display:none;}
+  .bottom-nav{display:block;}
+  .main-content{padding:16px;padding-bottom:90px;}
+  .topbar{padding:12px 16px;}
+  .topbar-brand{font-size:16px;}
+  .auth-card{padding:28px 20px;}
+  .gpa-number{font-size:28px;}
+  .form-row{grid-template-columns:1fr;}
+  .chart-grid{grid-template-columns:1fr;}
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  .gpa-grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:400px){
+  .gpa-grid{grid-template-columns:1fr;}
+  .stats-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="screen active">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="logo-icon">🌍</span>
+      <h1>Welcome to GradeAtlas</h1>
+      <p>Smart Grade Management Platform</p>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="Enter your email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Enter your password">
+    </div>
+    <button class="btn btn-primary btn-full" id="login-btn">🔐 Login</button>
+    <p class="auth-footer">Don't have an account? <a id="go-register">Register</a></p>
+  </div>
+</div>
+
+<!-- REGISTER SCREEN -->
+<div id="register-screen" class="screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="logo-icon">🌍</span>
+      <h1>Create Account</h1>
+      <p>Join GradeAtlas Today</p>
+    </div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="reg-username" placeholder="Choose a username">
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="reg-email" placeholder="Enter your email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="reg-password" placeholder="At least 6 characters">
+    </div>
+    <button class="btn btn-primary btn-full" id="register-btn">✅ Create Account</button>
+    <p class="auth-footer">Already have an account? <a id="go-login">Login</a></p>
+  </div>
+</div>
+
+<!-- DASHBOARD SCREEN -->
+<div id="dashboard-screen" class="screen">
+  <div class="topbar">
+    <span class="topbar-brand">🌍 GradeAtlas</span>
+    <div class="topbar-right">
+      <span class="user-badge" id="user-badge">👤 User</span>
+      <button class="btn btn-ghost btn-sm" id="logout-btn">Logout</button>
+    </div>
+  </div>
+
+  <div class="dash-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <button class="sidebar-item active" data-tab="overview">📊 Overview</button>
+      <button class="sidebar-item" data-tab="subjects">📚 Subjects</button>
+      <button class="sidebar-item" data-tab="timetable">🗓️ Timetable</button>
+      <button class="sidebar-item" data-tab="analytics">📈 Analytics</button>
+      <button class="sidebar-item" data-tab="tools">🔧 Tools</button>
+    </aside>
+
+    <main class="main-content">
+
+      <!-- OVERVIEW TAB -->
+      <div id="panel-overview" class="tab-panel active">
+        <div class="section-mb">
+          <div class="section-title">GPA Status</div>
+          <div class="gpa-grid">
+            <div class="gpa-card">
+              <div class="gpa-card-label">Current GPA</div>
+              <div id="current-gpa" class="gpa-number neutral">0.00</div>
+              <span id="gpa-badge" class="gpa-badge badge-poor">No Data</span>
+            </div>
+            <div class="gpa-card">
+              <div class="gpa-card-label">Target GPA</div>
+              <div id="display-target" class="gpa-number neutral">—</div>
+              <div class="target-row">
+                <input type="number" id="target-gpa-input" placeholder="e.g. 3.5" step="0.1" min="0" max="4">
+                <button class="btn btn-primary btn-sm" id="set-target-btn">Set</button>
+              </div>
+            </div>
+            <div class="gpa-card">
+              <div class="gpa-card-label">Progress to Target</div>
+              <div class="progress-bar"><div id="gpa-progress" class="progress-fill" style="width:0%"></div></div>
+              <div id="progress-text" class="progress-label">0% to target</div>
+            </div>
+          </div>
+        </div>
+        <div class="section-mb">
+          <div class="section-title">Quick Stats</div>
+          <div class="stats-grid">
+            <div class="stat-card"><div class="stat-label">Subjects</div><div id="stat-subjects" class="stat-value">0</div></div>
+            <div class="stat-card"><div class="stat-label">Avg Score</div><div id="stat-average" class="stat-value">0%</div></div>
+            <div class="stat-card"><div class="stat-label">Strongest</div><div id="stat-strongest" class="stat-value">—</div></div>
+            <div class="stat-card"><div class="stat-label">Weakest</div><div id="stat-weakest" class="stat-value">—</div></div>
+            <div class="stat-card"><div class="stat-label">Classes</div><div id="stat-classes" class="stat-value">0</div></div>
+            <div class="stat-card"><div class="stat-label">Study Hours</div><div id="stat-hours" class="stat-value">0h</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBJECTS TAB -->
+      <div id="panel-subjects" class="tab-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div class="section-title">Your Subjects</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button id="mode-absolute" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);">⚡ Absolute Mode</button>
+            <button id="mode-relative" class="btn btn-sm" style="background:transparent;border:1px solid var(--border);">🎯 Relative Mode</button>
+          </div>
+        </div>
+
+        <!-- SUMMARY BAR -->
+        <div id="subjects-summary" class="add-form" style="display:flex;gap:12px;align-items:center;justify-content:space-between;margin-top:12px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <div><strong>Total:</strong> <span id="summary-total">0</span></div>
+            <div><strong>Avg GPA:</strong> <span id="summary-avg">—</span></div>
+            <div><strong>At Risk:</strong> <span id="summary-risk">0</span></div>
+            <div><strong>On Track:</strong> <span id="summary-track">0</span></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button id="import-subjects-btn" class="btn btn-ghost btn-sm">Import</button>
+            <button id="clear-panel-btn" class="btn btn-danger btn-sm">Clear Panel</button>
+          </div>
+        </div>
+
+        <!-- ENHANCED ADD / EDIT UI (keeps original input IDs for compatibility) -->
+        <div class="add-form" style="margin-top:14px;">
+          <div id="panel-empty-state" class="empty-state" style="display:none;">
+            <div style="font-size:56px;">🎓</div>
+            <h3 style="margin:8px 0 6px 0;color:var(--text);">Your academic journey starts here!</h3>
+            <p style="color:var(--text2);margin-bottom:12px;">Add your first subject to begin tracking progress.</p>
+            <button id="empty-add-btn" class="btn btn-primary">+ Add Subject</button>
+          </div>
+
+          <!-- Semester Stage Selector (pills) -->
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+            <div id="stage-mid" class="stage-pill" style="cursor:pointer;padding:8px 14px;border-radius:999px;border:1px solid var(--border);">📚 Mid-Semester</div>
+            <div id="stage-post" class="stage-pill" style="cursor:pointer;padding:8px 14px;border-radius:999px;border:1px solid var(--border);">📝 Post-Midterm</div>
+            <div id="stage-complete" class="stage-pill" style="cursor:pointer;padding:8px 14px;border-radius:999px;border:1px solid var(--border);">✅ Semester Complete</div>
+          </div>
+
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:220px;"> 
+              <label class="form-label">Subject Name *</label>
+              <input type="text" id="subject-name" class="input-field" placeholder="e.g. Mathematics">
+            </div>
+            <div style="width:110px;min-width:100px;">
+              <label class="form-label">Credit Hours</label>
+              <input type="number" id="subject-credits" class="input-field" value="3" min="1">
+            </div>
+            <div style="width:160px;">
+              <label class="form-label">Grading System</label>
+              <select id="subject-system" class="input-field">
+                <option value="pakistan">🇵🇰 Pakistan</option>
+                <option value="usa">🇺🇸 USA</option>
+                <option value="uk">🇬🇧 UK</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ABSOLUTE MODE COMPONENTS -->
+          <div id="absolute-panel" style="margin-top:12px;display:none;">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+              <strong style="color:var(--text2);">Components (weights must sum to 100%)</strong>
+              <div id="weights-status" style="margin-left:8px;color:var(--text2);"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+              <div style="background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);">
+                <div style="font-weight:700;color:#c4b5fd;margin-bottom:10px;">📝 MIDTERM</div>
+                <label class="form-label">Weight %</label>
+                <input type="number" id="comp-mid-weight" class="input-field" min="0" max="100" value="30">
+                <label class="form-label">Obtained</label>
+                <input type="number" id="comp-mid-obt" class="input-field" placeholder="e.g. 35" min="0">
+                <label class="form-label">Total</label>
+                <input type="number" id="comp-mid-total" class="input-field" min="1" value="50">
+              </div>
+              <div style="background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);">
+                <div style="font-weight:700;color:#93c5fd;margin-bottom:10px;">📋 ASSIGNMENTS</div>
+                <label class="form-label">Weight %</label>
+                <input type="number" id="comp-assn-weight" class="input-field" min="0" max="100" value="20">
+                <label class="form-label">How many assignments?</label>
+                <input type="number" id="comp-assn-count" class="input-field" min="1" max="10" value="1">
+                <div id="assignments-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+              </div>
+              <div style="background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);">
+                <div style="font-weight:700;color:#fbbf24;margin-bottom:10px;">📊 QUIZZES</div>
+                <label class="form-label">Weight %</label>
+                <input type="number" id="comp-quiz-weight" class="input-field" min="0" max="100" value="10">
+                <label class="form-label">How many quizzes?</label>
+                <input type="number" id="comp-quiz-count" class="input-field" min="1" max="10" value="1">
+                <div id="quizzes-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+              </div>
+              <div id="project-panel" style="display:none;background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);">
+                <div style="font-weight:700;color:#4ade80;margin-bottom:10px;">🎯 PROJECTS</div>
+                <label class="form-label">Weight %</label>
+                <input type="number" id="comp-project-weight" class="input-field" min="0" max="100" value="0">
+                <label class="form-label">How many projects?</label>
+                <input type="number" id="comp-project-count" class="input-field" min="1" max="5" value="1">
+                <div id="projects-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+              </div>
+              <div id="final-block" style="background:var(--bg3);padding:14px;border-radius:16px;border:1px solid var(--border);transition:all 0.28s ease;">
+                <div style="font-weight:700;color:#f87171;margin-bottom:10px;">🏆 FINAL EXAM</div>
+                <label class="form-label">Weight %</label>
+                <input type="number" id="comp-final-weight" class="input-field" min="0" max="100" value="40">
+                <label class="form-label">Obtained</label>
+                <input type="number" id="comp-final-obt" class="input-field" placeholder="e.g. 35" min="0">
+                <label class="form-label">Total</label>
+                <input type="number" id="comp-final-total" class="input-field" min="1" value="100">
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+              <div><strong>Preview:</strong> <span id="abs-preview-pct">—</span></div>
+              <div><strong>GPA:</strong> <span id="abs-preview-gpa">—</span></div>
+              <div id="abs-warning" style="margin-left:12px;color:var(--amber);"></div>
+              <div id="stage-msg" style="margin-left:12px;color:var(--text2);"></div>
+            </div>
+          </div>
+
+          <!-- RELATIVE MODE -->
+          <div id="relative-panel" style="margin-top:12px;display:none;">
+            <div style="display:flex;gap:12px;align-items:center;">
+              <div style="flex:1;">
+                <label class="form-label">GPA</label>
+                <input type="range" id="rel-gpa-slider" min="0" max="4" step="0.1" value="3">
+              </div>
+              <div style="width:80px;">
+                <label class="form-label">Value</label>
+                <input type="number" id="rel-gpa-number" class="input-field" min="0" max="4" step="0.1" value="3.0">
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:12px;align-items:center;">
+            <button id="add-subject-btn" class="btn btn-primary">+ Add Subject</button>
+            <button id="cancel-edit-btn" class="btn btn-ghost">Cancel</button>
+          </div>
+        </div>
+
+        <div id="subjects-list" class="subject-grid" style="margin-top:14px;">
+          <div class="empty-state"><div>📚</div><p>No subjects yet. Add your first subject above!</p></div>
+        </div>
+
+        <!-- PANEL-SCOPED STYLE + SCRIPT: UI styles, rich card rendering, and wiring to existing global functions/data -->
+        <style>
+          /* Panel-specific styles (dark theme + animations) */
+          #panel-subjects .mode-active{transform:translateY(-3px);box-shadow:0 6px 20px rgba(108,99,255,0.18);} 
+          .subject-card.rich{transition:box-shadow 0.18s, transform 0.12s;border:1px solid rgba(108,99,255,0.06);} 
+          .subject-card.rich:hover{box-shadow:0 10px 36px rgba(139,133,255,0.12);transform:translateY(-6px);}
+          .mini-bars{display:flex;gap:8px;margin-top:8px;align-items:center;}
+          .mini-bar{flex:1;background:var(--bg3);height:10px;border-radius:8px;overflow:hidden;border:1px solid var(--border);} 
+          .mini-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--green));width:0%;transition:width 0.6s ease;} 
+          .chip{display:inline-block;padding:6px 8px;border-radius:999px;font-size:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);}
+          .badge-gpa{display:inline-block;padding:6px 8px;border-radius:10px;font-weight:700}
+          .gpa-4{background:linear-gradient(90deg,#ffd700,#ffec99);color:#111}
+          .gpa-35{background:linear-gradient(90deg,#ffb86b,#ffd9b3);color:#111}
+          .gpa-3{background:linear-gradient(90deg,#a78bfa,#e9d5ff);color:#111}
+          .gpa-2{background:linear-gradient(90deg,#60a5fa,#bfdbfe);color:#111}
+          .gpa-bad{background:linear-gradient(90deg,#ef4444,#fecaca);color:#111}
+          .ach-badges{display:flex;gap:6px;margin-top:8px}
+          .ach{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:8px;font-size:12px}
+          @keyframes glow { 0%{box-shadow:0 0 6px rgba(108,99,255,0.12)}50%{box-shadow:0 0 18px rgba(108,99,255,0.22)}100%{box-shadow:0 0 6px rgba(108,99,255,0.12)} }
+          #panel-empty-state .btn{animation:glow 2.4s infinite;}
+          .needs-chip{background:rgba(245,158,11,0.12);color:var(--amber);padding:6px 8px;border-radius:8px;border:1px solid rgba(245,158,11,0.22)}
+            /* Mode buttons (Absolute / Relative) */
+          #mode-absolute, #mode-relative{background:#1a1a24;color:#9090aa;border:1px solid rgba(255,255,255,0.15);padding:8px 10px;border-radius:10px;font-weight:600}
+          #mode-absolute:hover, #mode-relative:hover{background:#2a2a3a;color:#e6e6ff}
+          #panel-subjects .mode-active{background:#6c63ff;color:#ffffff;border:1px solid #6c63ff;box-shadow:0 6px 20px rgba(108,99,255,0.18);}
+          /* Stage pills */
+          .stage-pill{background:transparent;color:var(--text2);transition:all 0.18s;border-radius:999px;padding:8px 12px;}
+          .stage-pill.selected{background:linear-gradient(90deg,var(--primary),var(--primary2));color:#fff;border-color:transparent;transform:translateY(-3px)}
+          /* Stage border colors */
+          .stage-mid{border-color:rgba(96,165,250,0.18)!important}
+          .stage-post{border-color:rgba(245,158,11,0.18)!important}
+          .stage-complete{border-color:rgba(34,197,94,0.18)!important}
+          .pulse-warning{animation:pulse 1.2s ease-in-out infinite;}
+          @keyframes pulse{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.02);opacity:.8;}}
+          @media(max-width:600px){ .mini-bars{flex-direction:column;gap:6px;} }
+        </style>
+        <script>
+          (function(){
+            var MODE_KEY = 'subject_mode';
+            var STAGE_KEY = 'subject_stage';
+            var absBtn = document.getElementById('mode-absolute');
+            var relBtn = document.getElementById('mode-relative');
+            var absPanel = document.getElementById('absolute-panel');
+            var relPanel = document.getElementById('relative-panel');
+            var weightsStatus = document.getElementById('weights-status');
+            var stageMid = document.getElementById('stage-mid');
+            var stagePost = document.getElementById('stage-post');
+            var stageComplete = document.getElementById('stage-complete');
+            var finalBlock = document.getElementById('final-block');
+            var stageMsg = document.getElementById('stage-msg');
+
+            function setMode(m){ localStorage.setItem(MODE_KEY, m); if(m==='absolute'){ absBtn.classList.add('mode-active'); relBtn.classList.remove('mode-active'); absPanel.style.display=''; relPanel.style.display='none'; } else { relBtn.classList.add('mode-active'); absBtn.classList.remove('mode-active'); absPanel.style.display='none'; relPanel.style.display=''; } }
+            absBtn.addEventListener('click', function(){ setMode('absolute'); }); relBtn.addEventListener('click', function(){ setMode('relative'); }); var saved = localStorage.getItem(MODE_KEY) || 'absolute'; setMode(saved);
+
+            function setStage(s){ localStorage.setItem(STAGE_KEY, s); [stageMid,stagePost,stageComplete].forEach(function(el){ if(!el) return; el.classList.remove('selected'); }); if(s==='mid-semester'){ stageMid.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='0'; if(stageMsg) stageMsg.textContent = "Final exam not yet — we'll predict your target!"; } else if(s==='post-midterm'){ stagePost.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='1'; if(stageMsg) stageMsg.textContent = "Finals approaching — final marks optional (leave blank to predict)."; } else { stageComplete.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='1'; if(stageMsg) stageMsg.textContent = "Semester complete — enter all marks to compute final GPA."; } }
+            stageMid.addEventListener('click', function(){ setStage('mid-semester'); }); stagePost.addEventListener('click', function(){ setStage('post-midterm'); }); stageComplete.addEventListener('click', function(){ setStage('complete'); });
+            var savedStage = localStorage.getItem(STAGE_KEY) || 'mid-semester'; setStage(savedStage);
+
+            // slider sync
+            var slider = document.getElementById('rel-gpa-slider'); var number = document.getElementById('rel-gpa-number'); if(slider && number){ slider.addEventListener('input', function(){ number.value = slider.value; }); number.addEventListener('input', function(){ slider.value = number.value; }); }
+
+            // weight preview and stage-aware messages
+            var wMid = document.getElementById('comp-mid-weight');
+            var midObt = document.getElementById('comp-mid-obt'); var midTot = document.getElementById('comp-mid-total');
+
+            var wAss = document.getElementById('comp-assn-weight');
+            var assCount = document.getElementById('comp-assn-count');
+            var assignmentsList = document.getElementById('assignments-list');
+
+            var wQuiz = document.getElementById('comp-quiz-weight');
+            var quizCount = document.getElementById('comp-quiz-count');
+            var quizzesList = document.getElementById('quizzes-list');
+
+            var wProject = document.getElementById('comp-project-weight');
+            var projectCount = document.getElementById('comp-project-count');
+            var projectsList = document.getElementById('projects-list');
+            var projectPanel = document.getElementById('project-panel');
+
+            var wFin = document.getElementById('comp-final-weight');
+            var finObt = document.getElementById('comp-final-obt'); var finTot = document.getElementById('comp-final-total');
+            var absPreviewPct = document.getElementById('abs-preview-pct'); var absPreviewGpa = document.getElementById('abs-preview-gpa'); var absWarning = document.getElementById('abs-warning');
+
+            function buildRows(container, count, rowHtml) {
+              if(!container) return;
+              container.innerHTML = '';
+              for(var i=1;i<=count;i++){
+                var row = document.createElement('div');
+                row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:flex-end;';
+                row.innerHTML = rowHtml(i);
+                container.appendChild(row);
+              }
+            }
+
+            function buildAssignmentRows(count){ buildRows(assignmentsList, count, function(i){ return '<div><label class="form-label">Assignment '+i+'</label><input type="number" class="input-field assignment-obt" placeholder="e.g. 35" min="0"></div><div><label class="form-label">Total</label><input type="number" class="input-field assignment-total" placeholder="10" min="1" value="10"></div>'; }); }
+            function buildQuizRows(count){ buildRows(quizzesList, count, function(i){ return '<div><label class="form-label">Quiz '+i+'</label><input type="number" class="input-field quiz-obt" placeholder="e.g. 35" min="0"></div><div><label class="form-label">Total</label><input type="number" class="input-field quiz-total" placeholder="10" min="1" value="10"></div>'; }); }
+            function buildProjectRows(count){ if(!projectsList) return; projectsList.innerHTML = ''; for(var i=1;i<=count;i++){ var row = document.createElement('div'); row.style.cssText = 'display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:8px;align-items:flex-end;'; row.innerHTML = '<div><label class="form-label">Project '+i+'</label><input type="text" class="input-field project-name" placeholder="Project name"></div><div><label class="form-label">Obtained</label><input type="number" class="input-field project-obt" placeholder="e.g. 35" min="0"></div><div><label class="form-label">Total</label><input type="number" class="input-field project-total" placeholder="10" min="1" value="10"></div>'; projectsList.appendChild(row); } }
+
+            function getRowsSummary(container, classes){
+              if(!container) return {avg:null, items:[]};
+              var rows = container.querySelectorAll('.' + classes.obt);
+              if(!rows.length) return {avg:null, items:[]};
+              var totalPct = 0; var count = 0; var items = [];
+              for(var i=0;i<rows.length;i++){
+                var row = rows[i].closest('div');
+                if(!row) continue;
+                var obt = safeFloat(row.querySelector('.' + classes.obt).value, null);
+                var tot = safeFloat(row.querySelector('.' + classes.tot).value, null);
+                var name = '';
+                if(classes.name){ var nm = row.querySelector('.' + classes.name); if(nm) name = nm.value.trim(); }
+                var pct = null;
+                if(obt !== null && tot > 0){ pct = (obt / tot) * 100; totalPct += pct; count++; }
+                items.push({ name: name || ((classes.label||'Item') + ' ' + (i+1)), obt: obt, tot: tot, pct: pct });
+              }
+              return { avg: count ? totalPct / count : null, items: items };
+            }
+
+            function getNumericPct(obtEl, totEl){ var obt = safeFloat(obtEl.value, null); var tot = safeFloat(totEl.value, null); return (obt !== null && tot > 0) ? (obt / tot) * 100 : null; }
+
+            function targetPercentFromGPA(gpa){ if(gpa >= 4.0) return 85; if(gpa >= 3.7) return 80; if(gpa >= 3.3) return 75; if(gpa >= 3.0) return 71; if(gpa >= 2.7) return 68; if(gpa >= 2.3) return 64; if(gpa >= 2.0) return 61; if(gpa >= 1.7) return 58; if(gpa >= 1.3) return 54; if(gpa >= 1.0) return 50; return null; }
+
+            function resetAbsoluteDefaults(){ if(wMid) wMid.value='30'; if(midObt) midObt.value=''; if(midTot) midTot.value='50'; if(wAss) wAss.value='20'; if(assCount) assCount.value='1'; if(wQuiz) wQuiz.value='10'; if(quizCount) quizCount.value='1'; if(wProject) wProject.value='0'; if(projectCount) projectCount.value='1'; if(projectPanel) projectPanel.style.display='none'; if(wFin) wFin.value='40'; if(finObt) finObt.value=''; if(finTot) finTot.value='100'; if(assignmentsList) buildAssignmentRows(1); if(quizzesList) buildQuizRows(1); if(projectsList) projectsList.innerHTML=''; if(absPreviewPct) absPreviewPct.textContent='—'; if(absPreviewGpa) absPreviewGpa.textContent='—'; if(absWarning){ absWarning.textContent=''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; } if(weightsStatus){ weightsStatus.textContent='✅ Weights OK'; weightsStatus.style.color='var(--green)'; } }
+
+            function clampCount(input, min, max){ if(!input) return; var v = parseInt(input.value, 10); if(isNaN(v)) v = min; v = Math.max(min, Math.min(max, v)); if(input.value != v) input.value = v; return v; }
+
+            function calcPreview(){
+              var a = safeNum(wMid.value,0);
+              var b = safeNum(wAss.value,0);
+              var c = safeNum(wQuiz.value,0);
+              var d = safeNum(wProject.value,0);
+              var e = safeNum(wFin.value,0);
+              var totalWeight = a + b + c + d + e;
+              if(weightsStatus){
+                if(totalWeight === 100){ weightsStatus.textContent = '✅ Weights OK'; weightsStatus.style.color = 'var(--green)'; }
+                else if(totalWeight < 100){ weightsStatus.textContent = '⚠️ '+(100-totalWeight)+'% remaining'; weightsStatus.style.color = 'var(--amber)'; }
+                else { weightsStatus.textContent = '❌ '+(totalWeight-100)+'% too many'; weightsStatus.style.color = 'var(--red)'; }
+              }
+
+              var midPct = (midObt && midTot) ? getNumericPct(midObt, midTot) : null;
+              var assSummary = getRowsSummary(assignmentsList, {obt:'assignment-obt', tot:'assignment-total', label:'A'});
+              var quizSummary = getRowsSummary(quizzesList, {obt:'quiz-obt', tot:'quiz-total', label:'Q'});
+              var projectSummary = getRowsSummary(projectsList, {obt:'project-obt', tot:'project-total', name:'project-name', label:'P'});
+              var finPct = (finObt && finTot) ? getNumericPct(finObt, finTot) : null;
+
+              var weighted = 0;
+              if(midPct !== null) weighted += midPct * (a / 100);
+              if(assSummary.avg !== null) weighted += assSummary.avg * (b / 100);
+              if(quizSummary.avg !== null) weighted += quizSummary.avg * (c / 100);
+              if(projectSummary.avg !== null) weighted += projectSummary.avg * (d / 100);
+              if(finPct !== null) weighted += finPct * (e / 100);
+
+              var overall = totalWeight ? weighted : 0;
+              absPreviewPct.textContent = totalWeight ? overall.toFixed(1) + '%' : '—';
+              try { var g = pctToGPA(overall, document.getElementById('subject-system').value); absPreviewGpa.textContent = isFinite(g) ? g.toFixed(2) : '—'; } catch(e){ absPreviewGpa.textContent = '—'; }
+
+              var stage = localStorage.getItem(STAGE_KEY) || 'mid-semester';
+              if(stage === 'mid-semester'){
+                if(finalBlock) finalBlock.style.display='none';
+                if(absWarning){ absWarning.textContent = ''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; }
+              } else if(stage === 'post-midterm'){
+                if(finalBlock) finalBlock.style.display='block';
+                if(finObt && String(finObt.value).trim() === ''){
+                  if(absWarning){ absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; }
+                  var targetPct = targetPercentFromGPA(typeof targetGPA === 'number' ? targetGPA : parseFloat(targetGPA));
+                  if(targetPct !== null && e > 0){
+                    var currentScore = 0;
+                    if(midPct !== null) currentScore += midPct * (a / 100);
+                    if(assSummary.avg !== null) currentScore += assSummary.avg * (b / 100);
+                    if(quizSummary.avg !== null) currentScore += quizSummary.avg * (c / 100);
+                    if(projectSummary.avg !== null) currentScore += projectSummary.avg * (d / 100);
+                    var neededFinal = ((targetPct - currentScore) / (e / 100));
+                    if(neededFinal <= 0){ absWarning.textContent = '🎉 Target GPA already secured! Final is bonus!'; absWarning.style.color='var(--green)'; }
+                    else if(neededFinal <= 50){ absWarning.textContent = '✅ Easy! Need '+neededFinal.toFixed(0)+'% in Final'; absWarning.style.color='var(--green)'; }
+                    else if(neededFinal <= 75){ absWarning.textContent = '📈 Need '+neededFinal.toFixed(0)+'% in Final — achievable!'; absWarning.style.color='var(--amber)'; }
+                    else if(neededFinal <= 100){ absWarning.textContent = '⚠️ Need '+neededFinal.toFixed(0)+'% in Final — study hard!'; absWarning.style.color='orange'; }
+                    else { absWarning.textContent = '🚨 Target impossible even with 100% in Final!'; absWarning.style.color='red'; absWarning.classList.add('pulse-warning'); absWarning.style.animation='pulse 1.2s ease-in-out infinite'; }
+                  } else { if(absWarning) absWarning.textContent = ''; }
+                } else { if(absWarning) absWarning.textContent = ''; }
+              } else {
+                if(finalBlock) finalBlock.style.display='block';
+                if(absWarning) absWarning.textContent = '';
+              }
+            }
+
+            function syncDynamicRows(){
+              if(assCount) buildAssignmentRows(clampCount(assCount,1,10));
+              if(quizCount) buildQuizRows(clampCount(quizCount,1,10));
+              if(projectCount) buildProjectRows(clampCount(projectCount,1,5));
+            }
+
+            if(assCount) assCount.addEventListener('input', function(){ syncDynamicRows(); calcPreview(); });
+            if(quizCount) quizCount.addEventListener('input', function(){ syncDynamicRows(); calcPreview(); });
+            if(projectCount) projectCount.addEventListener('input', function(){ syncDynamicRows(); calcPreview(); });
+            [wMid, midObt, midTot, wAss, wQuiz, wProject, wFin, finObt, finTot].forEach(function(el){ if(el) el.addEventListener('input', calcPreview); });
+            if(assignmentsList) assignmentsList.addEventListener('input', calcPreview);
+            if(quizzesList) quizzesList.addEventListener('input', calcPreview);
+            if(projectsList) projectsList.addEventListener('input', calcPreview);
+            resetAbsoluteDefaults(); calcPreview();
+
+            window.populateSubjectFormFromRecord = function(s) {
+              if (!s) return;
+              if (s.mode) setMode(s.mode === 'relative' ? 'relative' : 'absolute');
+              if (s.stage) setStage(s.stage);
+              var comp = s.components || {};
+              var mid = comp.midterm || {}, ass = comp.assignment || {}, quiz = comp.quiz || {}, proj = comp.project || {}, fin = comp.final || {};
+              if (wMid) wMid.value = safeNum(mid.weight, wMid.value);
+              if (midObt) midObt.value = (mid.obtained != null && mid.obtained !== undefined) ? mid.obtained : '';
+              if (midTot) midTot.value = safeNum(mid.total, 100);
+              if (wAss) wAss.value = safeNum(ass.weight, wAss.value);
+              if (wQuiz) wQuiz.value = safeNum(quiz.weight, wQuiz.value);
+              if (wProject) wProject.value = safeNum(proj.weight, wProject.value);
+              if (wFin) wFin.value = safeNum(fin.weight, wFin.value);
+              if (finObt) finObt.value = (fin.obtained != null && fin.obtained !== undefined) ? fin.obtained : '';
+              if (finTot) finTot.value = safeNum(fin.total, 100);
+              calcPreview();
+            };
+
+            // add-subject hook: attach stage and final.hidden flag where appropriate
+            var addBtn = document.getElementById('add-subject-btn'); if(addBtn) addBtn.addEventListener('click', function(){ var capturedEditId = editingSubjectId; var mode = localStorage.getItem(MODE_KEY) || 'absolute'; if(mode==='absolute'){ var a=safeNum(wMid.value,0), b=safeNum(wAss.value,0), c=safeNum(wQuiz.value,0), d=safeNum(wProject.value,0), e=safeNum(wFin.value,0); var total=a+b+c+d+e||100; var sum=0; var midPct = (midObt && midTot)? getNumericPct(midObt, midTot): null; var assSummary = getRowsSummary(assignmentsList, {obt:'assignment-obt', tot:'assignment-total', label:'A'}); var quizSummary = getRowsSummary(quizzesList, {obt:'quiz-obt', tot:'quiz-total', label:'Q'}); var projectSummary = getRowsSummary(projectsList, {obt:'project-obt', tot:'project-total', label:'P'}); var finPct = (finObt && finTot)? getNumericPct(finObt, finTot): null; if(midPct !== null) sum += midPct * a; if(assSummary.avg !== null) sum += assSummary.avg * b; if(quizSummary.avg !== null) sum += quizSummary.avg * c; if(projectSummary.avg !== null) sum += projectSummary.avg * d; if(finPct !== null) sum += finPct * e; var combined = total? (sum/total)*100 : 0; var marksField = document.getElementById('subject-marks'); if (marksField) marksField.value = combined.toFixed(1); var totalField = document.getElementById('subject-total'); if (totalField) totalField.value = 100; } else { var marksField2 = document.getElementById('subject-marks'); if (marksField2) marksField2.value = ''; var totalField2 = document.getElementById('subject-total'); if (totalField2) totalField2.value = 100; }
+
+              setTimeout(function(){ try{ var wasEdit = capturedEditId != null; var s = null; if(wasEdit) s = subjects.find(function(x){ return x.id===capturedEditId; }); if(!s) s = subjects[subjects.length-1]; if(!s) return; var modeNow = localStorage.getItem(MODE_KEY) || 'absolute'; s.mode = modeNow; s.credits = parseInt(document.getElementById('subject-credits').value)||3; s.system = document.getElementById('subject-system').value||'pakistan'; var stageNow = localStorage.getItem(STAGE_KEY) || 'mid-semester'; s.stage = stageNow; if(modeNow==='absolute'){ var assSummary = getRowsSummary(assignmentsList, {obt:'assignment-obt', tot:'assignment-total', label:'A'}); var quizSummary = getRowsSummary(quizzesList, {obt:'quiz-obt', tot:'quiz-total', label:'Q'}); var projectSummary = getRowsSummary(projectsList, {obt:'project-obt', tot:'project-total', label:'P'}); s.components = { midterm: { weight: safeNum(wMid.value,0), obtained: (midObt.value==='')?null:safeNum(midObt.value,null), total: safeNum(midTot.value,100) }, assignment: { weight: safeNum(wAss.value,0), obtained: assSummary.avg!==null? assSummary.avg : null, total: 100 }, quiz: { weight: safeNum(wQuiz.value,0), obtained: quizSummary.avg!==null? quizSummary.avg : null, total: 100 }, project: { weight: safeNum(wProject.value,0), obtained: projectSummary.avg!==null? projectSummary.avg : null, total: 100 }, final: { weight: safeNum(wFin.value,0), obtained: (finObt.value==='')?null:safeNum(finObt.value,null), total: safeNum(finTot.value,100), hidden: (stageNow==='mid-semester') } }; var pctTxt = (document.getElementById('abs-preview-pct')||{textContent:''}).textContent; var pct = parseFloat(pctTxt) || null; if(pct) s.gpa = pctToGPA(pct, s.system); } else { s.components = {}; s.gpa = parseFloat(document.getElementById('rel-gpa-number').value) || null; } s.dateAdded = s.dateAdded || Date.now(); saveData(); renderAll(); if(!wasEdit){ resetAbsoluteDefaults(); var nameField = document.getElementById('subject-name'); if(nameField) nameField.value=''; var marksField = document.getElementById('subject-marks'); if(marksField) marksField.value=''; var totalField = document.getElementById('subject-total'); if(totalField) totalField.value='100'; calcPreview(); } }catch(e){ console.error(e); } },80);
+            });
+
+            // Rich subject card renderer with stage badges and border colors
+            function renderSubjectsPanel(){ var container=document.getElementById('subjects-list'); if(!container) return; container.innerHTML=''; var arr = subjects || []; if(!arr.length){ container.innerHTML = '<div class="empty-state"><div>🎓</div><p>Your academic journey starts here!</p><button id="empty-add" class="btn btn-primary" style="margin-top:12px;">+ Add Subject</button></div>'; var ea = document.getElementById('empty-add'); if(ea) ea.addEventListener('click', function(){ document.getElementById('subject-name').focus(); }); return; }
+
+              arr.forEach(function(s){ if(!s) return; var comp = s.components || {}; function compPct(c){ if(!c) return null; var obt=c.obtained; var tot=c.total||100; return (obt===null||obt===undefined)? null : (safeNum(obt,0)/safeNum(tot,100))*100; } var mid = comp.midterm, ass = comp.assignment, fin = comp.final; var midPct=compPct(mid), assPct=compPct(ass), finPct=compPct(fin); var totalW = (safeNum((mid && mid.weight)||0,0)+safeNum((ass && ass.weight)||0,0)+safeNum((fin && fin.weight)||0,0))||100; var cur=0; if(midPct!==null) cur+=midPct*(safeNum((mid && mid.weight)||0,0)/100); if(assPct!==null) cur+=assPct*(safeNum((ass && ass.weight)||0,0)/100); if(finPct!==null) cur+=finPct*(safeNum((fin && fin.weight)||0,0)/100); var overall = cur||null; var gpa = (s.gpa!==undefined && s.gpa!==null)? s.gpa : (overall!==null? pctToGPA(overall, s.system): null);
+
+                var card = document.createElement('div'); card.className='subject-card rich';
+                // stage visual
+                var stage = s.stage||'mid-semester'; if(stage==='mid-semester') card.classList.add('stage-mid'); else if(stage==='post-midterm') card.classList.add('stage-post'); else card.classList.add('stage-complete');
+                var stageLabel = (stage==='mid-semester')? '📚 Mid-Sem' : (stage==='post-midterm')? '📝 Finals' : '✅ Complete';
+                var systemLabel = s.system==='usa'?'🇺🇸 USA': s.system==='uk'?'🇬🇧 UK':'🇵🇰 PK';
+                var gpaBadgeClass='gpa-3'; var gpaDisplay = gpa!==null? parseFloat(gpa).toFixed(2):'—'; if(gpa!==null){ if(gpa>=4) gpaBadgeClass='gpa-4'; else if(gpa>=3.5) gpaBadgeClass='gpa-35'; else if(gpa>=3.0) gpaBadgeClass='gpa-3'; else if(gpa>=2.0) gpaBadgeClass='gpa-2'; else gpaBadgeClass='gpa-bad'; }
+
+                var needsChip=''; if((fin && (fin.obtained===null||fin.obtained===undefined)) && typeof targetGPA==='number' && targetGPA>0){ var req=null; for(var t=0;t<=100;t+=0.5){ if(pctToGPA(t, s.system) >= targetGPA){ req=t; break; } } if(req!==null){ var curWeighted=0; if(midPct!==null) curWeighted += midPct*(safeNum((mid&&mid.weight)||0,0)/100); if(assPct!==null) curWeighted += assPct*(safeNum((ass&&ass.weight)||0,0)/100); var finalW = safeNum((fin&&fin.weight)||0,0); var need = Math.ceil(Math.max(0, (req - curWeighted) * 100 / (finalW||1))); if(need>100) needsChip = '<span class="needs-chip">⚠️ Even 100% in Final won\'t save your GPA!</span>'; else needsChip = '<span class="needs-chip">You need '+need+'% in Final</span>'; } }
+
+                var badgesHtml=''; if((midPct!==null && midPct>95) || (assPct!==null && assPct>95) || (finPct!==null && finPct>95)) badgesHtml += '<span class="ach">🏆 Perfect</span>'; if((midPct!==null && midPct>80) && (assPct!==null && assPct>80) && (finPct!==null && finPct>80)) badgesHtml += '<span class="ach">🔥 On Fire</span>'; if(gpa!==null && gpa<2.0) badgesHtml += '<span class="ach">💀 At Risk</span>'; if(gpa!==null && typeof targetGPA==='number' && targetGPA>0 && gpa>=targetGPA) badgesHtml += '<span class="ach">🎯 On Track</span>';
+
+                // show Pending when obtained null
+                var midLabel = (midPct!==null)? (midPct.toFixed(0)+'%') : 'Pending'; var assLabel = (assPct!==null)? (assPct.toFixed(0)+'%') : 'Pending'; var finLabel = (finPct!==null)? (finPct.toFixed(0)+'%') : (fin && fin.hidden ? 'Hidden' : 'Pending');
+
+                card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-weight:700;font-size:15px;">'+escapeHtml(s.name)+' <span class="chip">'+stageLabel+'</span></div><div style="font-size:12px;color:var(--text2);">Credits: '+(s.credits||3)+' • '+systemLabel+'</div></div><div style="text-align:right"><div class="badge-gpa '+gpaBadgeClass+'">'+gpaDisplay+'</div>'+ (needsChip?('<div style="margin-top:6px;">'+needsChip+'</div>'):'') +'</div></div>'+
+                  '<div class="mini-bars">' +
+                    '<div style="flex:1"><div style="font-size:12px;color:var(--text2);">🎯 Midterm • '+midLabel+'</div><div class="mini-bar"><div class="mini-fill" style="width:'+(midPct!==null?Math.min(100,midPct).toFixed(1):0)+'%"></div></div></div>'+
+                    '<div style="flex:1"><div style="font-size:12px;color:var(--text2);">📝 Assignment • '+assLabel+'</div><div class="mini-bar"><div class="mini-fill" style="width:'+(assPct!==null?Math.min(100,assPct).toFixed(1):0)+'%"></div></div></div>'+
+                    '<div style="flex:1"><div style="font-size:12px;color:var(--text2);">🏆 Final • '+finLabel+'</div><div class="mini-bar"><div class="mini-fill" style="width:'+(finPct!==null?Math.min(100,finPct).toFixed(1):0)+'%"></div></div></div>'+
+                  '</div>'+
+                  '<div class="ach-badges">'+badgesHtml+'</div>'+
+                  '<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-ghost btn-sm edit-sub">✏️ Edit</button><button class="btn btn-danger btn-sm del-sub">🗑️ Delete</button></div>';
+
+                // border color per stage
+                if(stage==='mid-semester') card.style.borderColor='rgba(96,165,250,0.14)'; else if(stage==='post-midterm') card.style.borderColor='rgba(245,158,11,0.14)'; else card.style.borderColor='rgba(34,197,94,0.12)';
+
+                setTimeout(function(){ var edit = card.querySelector('.edit-sub'); if(edit) edit.addEventListener('click', function(){ if(typeof editSubject==='function') editSubject(s.id); }); var del = card.querySelector('.del-sub'); if(del) del.addEventListener('click', function(){ if(typeof deleteSubject==='function') deleteSubject(s.id); }); },10);
+                container.appendChild(card);
+              });
+            }
+
+            if(typeof window.renderSubjects === 'function'){ window._origRenderSubjects = window.renderSubjects; }
+            window.renderSubjects = function(){ try{ renderSubjectsPanel(); }catch(e){ if(window._origRenderSubjects) window._origRenderSubjects(); } };
+
+            var _origSave = window.saveData;
+            window.saveData = function(){ try{ if(typeof _origSave==='function') _origSave(); }catch(e){} try{ window.renderSubjects(); try{ if(typeof renderOverview === 'function') renderOverview(); }catch(e){} }catch(e){} };
+
+            try{ window.renderSubjects(); }catch(e){}
+          })();
+        </script>
+      </div>
+
+      <!-- TIMETABLE TAB -->
+      <div id="panel-timetable" class="tab-panel">
+        <div class="section-title">🗓️ Timetable</div>
+        <div class="add-form">
+          <div id="tt-edit-notice" class="edit-mode-notice">
+            ✏️ Editing class — update fields and click Update Class
+            <button class="btn btn-sm" id="cancel-tt-edit-btn" style="margin-left:auto;background:rgba(245,158,11,0.2);color:var(--amber);border:1px solid rgba(245,158,11,0.4);">Cancel</button>
+          </div>
+          <div class="form-row">
+            <div>
+              <label class="form-label">Subject Name *</label>
+              <input type="text" id="tt-subject" class="input-field" placeholder="e.g. Mathematics">
+            </div>
+            <div>
+              <label class="form-label">Day *</label>
+              <select id="tt-day" class="input-field">
+                <option>Monday</option>
+                <option>Tuesday</option>
+                <option>Wednesday</option>
+                <option>Thursday</option>
+                <option>Friday</option>
+                <option>Saturday</option>
+                <option>Sunday</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label class="form-label">Start Time *</label>
+              <input type="time" id="tt-start" class="input-field">
+            </div>
+            <div>
+              <label class="form-label">End Time *</label>
+              <input type="time" id="tt-end" class="input-field">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-full" id="add-tt-btn">+ Add Class</button>
+        </div>
+        <div id="timetable-list" class="tt-grid">
+          <div class="empty-state"><div>🗓️</div><p>No classes yet. Add your first class above!</p></div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS TAB -->
+      <div id="panel-analytics" class="tab-panel">
+        <div class="section-title">Performance Analytics</div>
+        <div class="chart-grid">
+          <div class="chart-card"><h3>Subject Scores (%)</h3><canvas id="bar-chart"></canvas></div>
+          <div class="chart-card"><h3>Score Distribution</h3><canvas id="pie-chart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- TOOLS TAB -->
+      <div id="panel-tools" class="tab-panel">
+        <div class="section-title">Grade Tools</div>
+        <div class="tool-card">
+          <div class="section-title" style="font-size:15px;">🧮 Grade Calculator</div>
+          <label class="form-label">Enter Marks (0 – 100)</label>
+          <input type="number" id="calc-marks" class="input-field" placeholder="e.g. 75" step="0.1" min="0" max="100">
+          <label class="form-label">Grading System</label>
+          <select id="calc-system" class="input-field">
+            <option value="pakistan">🇵🇰 Pakistan</option>
+            <option value="usa">🇺🇸 USA</option>
+            <option value="uk">🇬🇧 UK</option>
+          </select>
+          <button class="btn btn-primary btn-full" id="calc-btn">Calculate Grade</button>
+          <div id="calc-result" class="tool-result"></div>
+        </div>
+        <div class="tool-card">
+          <div class="section-title" style="font-size:15px;">⏰ Exam Countdown</div>
+          <label class="form-label">Exam Name</label>
+          <input type="text" id="exam-name" class="input-field" placeholder="e.g. Final Exams">
+          <label class="form-label">Exam Date</label>
+          <input type="date" id="exam-date" class="input-field">
+          <button class="btn btn-primary btn-full" id="countdown-btn">Start Countdown</button>
+          <div id="countdown-display" class="countdown-display"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Bottom Nav (Mobile) -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <button class="bnav-item active" data-tab="overview"><span class="bnav-icon">📊</span><span class="bnav-label">Overview</span></button>
+      <button class="bnav-item" data-tab="subjects"><span class="bnav-icon">📚</span><span class="bnav-label">Subjects</span></button>
+      <button class="bnav-item" data-tab="timetable"><span class="bnav-icon">🗓️</span><span class="bnav-label">Timetable</span></button>
+      <button class="bnav-item" data-tab="analytics"><span class="bnav-icon">📈</span><span class="bnav-label">Analytics</span></button>
+      <button class="bnav-item" data-tab="tools"><span class="bnav-icon">🔧</span><span class="bnav-label">Tools</span></button>
+    </div>
+  </nav>
+</div>
+
+<!-- POPUP -->
+<div id="popup-overlay" class="popup-overlay">
+  <div class="popup-box">
+    <div id="popup-icon" class="popup-icon">✅</div>
+    <div id="popup-title" class="popup-title">Title</div>
+    <div id="popup-msg" class="popup-msg">Message</div>
+    <div class="popup-btns">
+      <button class="popup-btn-ok" id="popup-ok">OK</button>
+      <button class="popup-btn-cancel" id="popup-cancel" style="display:none">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+var subjects = [];
+var timetable = [];
+var targetGPA = 0;
+var users = [];
+var currentUser = null;
+var charts = {};
+var countdownTimer = null;
+var editingSubjectId = null;
+var editingTTId = null;
+
+// ============================================================
+// UTILITIES
+// ============================================================
+function generateId() {
+  return Date.now() + '_' + Math.random().toString(36).slice(2);
+}
+
+function safeFloat(val, fallback) {
+  var n = parseFloat(val);
+  return isFinite(n) ? n : fallback;
+}
+
+function parseJSON(str, fallback) {
+  try { return JSON.parse(str); } catch(e) { return fallback; }
+}
+
+// ============================================================
+// SCREEN
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+
+// ============================================================
+// POPUP
+// ============================================================
+var _popupConfirmCb = null;
+
+function showPopup(icon, title, msg, onConfirm) {
+  document.getElementById('popup-icon').textContent = icon;
+  document.getElementById('popup-title').textContent = title;
+  document.getElementById('popup-msg').textContent = msg;
+  var cancelBtn = document.getElementById('popup-cancel');
+  if (typeof onConfirm === 'function') {
+    _popupConfirmCb = onConfirm;
+    cancelBtn.style.display = 'inline-block';
+  } else {
+    _popupConfirmCb = null;
+    cancelBtn.style.display = 'none';
+  }
+  document.getElementById('popup-overlay').classList.add('active');
+}
+
+function closePopup() {
+  document.getElementById('popup-overlay').classList.remove('active');
+}
+
+document.getElementById('popup-ok').addEventListener('click', function() {
+  closePopup();
+  if (typeof _popupConfirmCb === 'function') {
+    var cb = _popupConfirmCb;
+    _popupConfirmCb = null;
+    cb();
+  }
+});
+
+document.getElementById('popup-cancel').addEventListener('click', function() {
+  _popupConfirmCb = null;
+  closePopup();
+});
+
+document.getElementById('popup-overlay').addEventListener('click', function(e) {
+  if (e.target === this) { _popupConfirmCb = null; closePopup(); }
+});
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type) {
+  var container = document.getElementById('toast-container');
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + (type || 'info');
+  t.textContent = msg;
+  container.appendChild(t);
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() { t.classList.add('show'); });
+  });
+  setTimeout(function() {
+    t.classList.remove('show');
+    setTimeout(function() { t.remove(); }, 300);
+  }, 3000);
+}
+
+// ============================================================
+// TAB NAVIGATION
+// ============================================================
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.sidebar-item, .bnav-item').forEach(function(b) { b.classList.remove('active'); });
+  var panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  document.querySelectorAll('[data-tab="' + name + '"]').forEach(function(b) { b.classList.add('active'); });
+  if (name === 'analytics') renderCharts();
+}
+
+document.querySelectorAll('.sidebar-item, .bnav-item').forEach(function(btn) {
+  btn.addEventListener('click', function() { switchTab(btn.dataset.tab); });
+});
+
+// ============================================================
+// GRADE LOGIC
+// ============================================================
+function pctToGPA(pct, system) {
+  if (system === 'pakistan') {
+    if (pct >= 85) return 4.0; if (pct >= 80) return 3.7;
+    if (pct >= 75) return 3.3; if (pct >= 71) return 3.0;
+    if (pct >= 68) return 2.7; if (pct >= 64) return 2.3;
+    if (pct >= 61) return 2.0; if (pct >= 58) return 1.7;
+    if (pct >= 54) return 1.3; if (pct >= 50) return 1.0;
+    return 0.0;
+  }
+  if (system === 'usa') {
+    if (pct >= 90) return 4.0; if (pct >= 80) return 3.0;
+    if (pct >= 70) return 2.0; if (pct >= 60) return 1.0;
+    return 0.0;
+  }
+  // UK
+  if (pct >= 70) return 4.0; if (pct >= 60) return 3.0;
+  if (pct >= 50) return 2.0; if (pct >= 40) return 1.0;
+  return 0.0;
+}
+
+function pctToGrade(pct, system) {
+  if (system === 'pakistan') {
+    if (pct >= 85) return 'A+'; if (pct >= 80) return 'A';
+    if (pct >= 75) return 'A-'; if (pct >= 71) return 'B+';
+    if (pct >= 68) return 'B'; if (pct >= 64) return 'B-';
+    if (pct >= 61) return 'C+'; if (pct >= 58) return 'C';
+    if (pct >= 54) return 'C-'; if (pct >= 50) return 'D';
+    return 'F';
+  }
+  if (system === 'usa') {
+    if (pct >= 90) return 'A'; if (pct >= 80) return 'B';
+    if (pct >= 70) return 'C'; if (pct >= 60) return 'D';
+    return 'F';
+  }
+  if (pct >= 70) return 'First'; if (pct >= 60) return '2:1';
+  if (pct >= 50) return '2:2'; if (pct >= 40) return 'Third';
+  return 'Fail';
+}
+
+function calcOverallGPA() {
+  subjects = subjects || [];
+  var scored = subjects.filter(function(s) {
+    return s && s.marks !== null && s.marks !== undefined && s.marks !== '';
+  });
+  if (!scored.length) return 0;
+  var totalPts = 0, totalCr = 0;
+  scored.forEach(function(s) {
+    var pct = (safeFloat(s.marks, 0) / safeFloat(s.total, 100)) * 100;
+    var cr = safeFloat(s.credits, 3);
+    totalPts += pctToGPA(pct, s.system) * cr;
+    totalCr += cr;
+  });
+  return totalCr ? totalPts / totalCr : 0;
+}
+
+// ============================================================
+// LOCAL STORAGE
+// ============================================================
+function saveData() {
+  localStorage.setItem('ga_users', JSON.stringify(users));
+  if (currentUser) {
+    localStorage.setItem('ga_subjects_' + currentUser.email, JSON.stringify(subjects));
+    localStorage.setItem('ga_timetable_' + currentUser.email, JSON.stringify(timetable));
+    localStorage.setItem('ga_target_' + currentUser.email, String(targetGPA));
+  }
+}
+
+function loadUserData() {
+  if (!currentUser) return;
+  subjects = parseJSON(localStorage.getItem('ga_subjects_' + currentUser.email), []);
+  timetable = parseJSON(localStorage.getItem('ga_timetable_' + currentUser.email), []);
+  targetGPA = safeFloat(localStorage.getItem('ga_target_' + currentUser.email), 0);
+}
+
+// ============================================================
+// RENDER OVERVIEW
+// ============================================================
+function renderOverview() {
+  var gpa = calcOverallGPA();
+  var gpaEl = document.getElementById('current-gpa');
+  var badge = document.getElementById('gpa-badge');
+  gpaEl.textContent = gpa.toFixed(2);
+  if (gpa >= 3.5) {
+    gpaEl.className = 'gpa-number good';
+    badge.textContent = '🌟 Excellent'; badge.className = 'gpa-badge badge-excellent';
+  } else if (gpa >= 3.0) {
+    gpaEl.className = 'gpa-number good';
+    badge.textContent = '👍 Good'; badge.className = 'gpa-badge badge-good';
+  } else if (gpa >= 2.0) {
+    gpaEl.className = 'gpa-number warn';
+    badge.textContent = '📈 Average'; badge.className = 'gpa-badge badge-average';
+  } else if (gpa > 0) {
+    gpaEl.className = 'gpa-number bad';
+    badge.textContent = '💪 Needs Work'; badge.className = 'gpa-badge badge-poor';
+  } else {
+    gpaEl.className = 'gpa-number neutral';
+    badge.textContent = 'No Data'; badge.className = 'gpa-badge badge-poor';
+  }
+
+  document.getElementById('display-target').textContent = targetGPA > 0 ? targetGPA.toFixed(2) : '—';
+  if (targetGPA > 0) {
+    var pct = Math.min((gpa / targetGPA) * 100, 100);
+    document.getElementById('gpa-progress').style.width = pct.toFixed(0) + '%';
+    document.getElementById('progress-text').textContent = pct.toFixed(0) + '% to target';
+  } else {
+    document.getElementById('gpa-progress').style.width = '0%';
+    document.getElementById('progress-text').textContent = 'Set a target GPA above';
+  }
+
+  var withMarks = subjects.filter(function(s) {
+    return s && s.marks !== null && s.marks !== undefined && s.marks !== '';
+  });
+  document.getElementById('stat-subjects').textContent = (subjects || []).length;
+  document.getElementById('stat-classes').textContent = (timetable || []).length;
+
+  timetable = timetable || [];
+  var totalHours = timetable.reduce(function(acc, t) {
+    if (!t) return acc;
+    var start = t.start.split(':');
+    var end = t.end.split(':');
+    var diff = (parseInt(end[0]) * 60 + parseInt(end[1])) - (parseInt(start[0]) * 60 + parseInt(start[1]));
+    return acc + (diff > 0 ? diff / 60 : 0);
+  }, 0);
+  document.getElementById('stat-hours').textContent = totalHours.toFixed(1) + 'h';
+
+  if (withMarks.length) {
+    var pcts = withMarks.map(function(s) {
+      return (safeFloat(s.marks, 0) / safeFloat(s.total, 100)) * 100;
+    });
+    var avg = pcts.reduce(function(a, b) { return a + b; }, 0) / pcts.length;
+    document.getElementById('stat-average').textContent = avg.toFixed(1) + '%';
+    var maxI = pcts.indexOf(Math.max.apply(null, pcts));
+    var minI = pcts.indexOf(Math.min.apply(null, pcts));
+    document.getElementById('stat-strongest').textContent = withMarks[maxI].name;
+    document.getElementById('stat-weakest').textContent = withMarks[minI].name;
+  } else {
+    document.getElementById('stat-average').textContent = '—';
+    document.getElementById('stat-strongest').textContent = '—';
+    document.getElementById('stat-weakest').textContent = '—';
+  }
+}
+
+// ============================================================
+// RENDER SUBJECTS
+// ============================================================
+function renderSubjects() {
+  subjects = subjects || [];
+  var container = document.getElementById('subjects-list');
+  container.innerHTML = '';
+  if (!subjects.length) {
+    container.innerHTML = '<div class="empty-state"><div>📚</div><p>No subjects yet. Add your first subject above!</p></div>';
+    return;
+  }
+  subjects.forEach(function(s) {
+    if (!s) return;
+    var hasMarks = s.marks !== null && s.marks !== undefined && s.marks !== '';
+    var pct = hasMarks ? (safeFloat(s.marks, 0) / safeFloat(s.total, 100)) * 100 : null;
+    var grade = hasMarks ? pctToGrade(pct, s.system) : '—';
+    var gpa = hasMarks ? pctToGPA(pct, s.system).toFixed(2) : '—';
+    var color = !hasMarks ? 'neutral' : pct >= 70 ? 'good' : pct >= 50 ? 'warn' : 'bad';
+
+    var card = document.createElement('div');
+    card.className = 'subject-card';
+    card.innerHTML =
+      '<div class="subject-card-name">' + escapeHtml(s.name) + '</div>' +
+      '<div class="subject-card-pct ' + color + '">' + (hasMarks ? pct.toFixed(1) + '%' : 'No marks yet') + '</div>' +
+      '<div class="subject-card-meta">' +
+        'Grade: <b>' + grade + '</b> &nbsp;|&nbsp; GPA: <b>' + gpa + '</b><br>' +
+        'Credits: ' + safeFloat(s.credits, 3) + ' &nbsp;|&nbsp; System: ' + s.system +
+      '</div>' +
+      '<div class="subject-card-actions"></div>';
+
+    var editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-ghost btn-sm';
+    editBtn.textContent = '✏️ Edit';
+    editBtn.addEventListener('click', function() { editSubject(s.id); });
+
+    var delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-danger btn-sm';
+    delBtn.textContent = '🗑️ Delete';
+    delBtn.addEventListener('click', function() { deleteSubject(s.id); });
+
+    card.querySelector('.subject-card-actions').appendChild(editBtn);
+    card.querySelector('.subject-card-actions').appendChild(delBtn);
+    container.appendChild(card);
+  });
+}
+
+function editSubject(id) {
+  var s = subjects.find(function(x) { return x.id === id; });
+  if (!s) return;
+  editingSubjectId = id;
+  document.getElementById('subject-name').value = s.name;
+  var marksEl = document.getElementById('subject-marks');
+  if (marksEl) marksEl.value = s.marks !== null && s.marks !== undefined ? s.marks : '';
+  var totalEl = document.getElementById('subject-total');
+  if (totalEl) totalEl.value = safeFloat(s.total, 100);
+  document.getElementById('subject-credits').value = safeFloat(s.credits, 3);
+  document.getElementById('subject-system').value = s.system || 'pakistan';
+  document.getElementById('add-subject-btn').textContent = '✅ Update Subject';
+  var editNotice = document.getElementById('edit-notice');
+  if (editNotice) editNotice.classList.add('show');
+  if (typeof window.populateSubjectFormFromRecord === 'function') window.populateSubjectFormFromRecord(s);
+  switchTab('subjects');
+  document.getElementById('subject-name').focus();
+  showToast('Editing "' + s.name + '" — make changes above', 'info');
+}
+
+function deleteSubject(id) {
+  var s = subjects.find(function(x) { return x.id === id; });
+  if (!s) return;
+  showPopup('🗑️', 'Delete Subject', 'Delete "' + s.name + '"? This cannot be undone.', function() {
+    subjects = subjects.filter(function(x) { return x.id !== id; });
+    saveData();
+    renderAll();
+    showToast('Subject deleted!', 'info');
+  });
+}
+
+function cancelEditSubject() {
+  editingSubjectId = null;
+  document.getElementById('add-subject-btn').textContent = '+ Add Subject';
+  var editNotice = document.getElementById('edit-notice');
+  if (editNotice) editNotice.classList.remove('show');
+  document.getElementById('subject-name').value = '';
+  var marksEl = document.getElementById('subject-marks');
+  if (marksEl) marksEl.value = '';
+  var totalEl = document.getElementById('subject-total');
+  if (totalEl) totalEl.value = '100';
+  document.getElementById('subject-credits').value = '3';
+  document.getElementById('subject-system').value = 'pakistan';
+}
+
+document.getElementById('cancel-edit-btn').addEventListener('click', cancelEditSubject);
+
+document.getElementById('add-subject-btn').addEventListener('click', function() {
+  var name = document.getElementById('subject-name').value.trim();
+  var marksRaw = (document.getElementById('subject-marks')||{value:''}).value.trim();
+  var total = safeFloat((document.getElementById('subject-total')||{value:100}).value, 100);
+  var credits = safeFloat((document.getElementById('subject-credits')||{value:3}).value, 3);
+  var system = (document.getElementById('subject-system')||{value:'pakistan'}).value;
+  var mode = localStorage.getItem('subject_mode') || 'absolute';
+  var stage = localStorage.getItem('subject_stage') || 'mid-semester';
+
+  if (!name) { showPopup('⚠️', 'Missing Name', 'Please enter a subject name.'); return; }
+  if (total <= 0) { showPopup('⚠️', 'Invalid Total', 'Total marks must be greater than 0.'); return; }
+  if (credits <= 0) { showPopup('⚠️', 'Invalid Credits', 'Credit hours must be greater than 0.'); return; }
+
+  var marks = null;
+  if (marksRaw !== '') {
+    marks = safeFloat(marksRaw, null);
+    if (marks === null || marks < 0 || marks > total) { showPopup('⚠️', 'Invalid Marks', 'Marks must be between 0 and ' + total + '. Leave blank to skip.'); return; }
+  }
+
+  // If absolute mode, validate weights
+  var components = {};
+  if (mode === 'absolute') {
+    var wMid = safeFloat((document.getElementById('comp-mid-weight')||{value:0}).value, 0);
+    var wAss = safeFloat((document.getElementById('comp-assn-weight')||{value:0}).value, 0);
+    var wQuiz = safeFloat((document.getElementById('comp-quiz-weight')||{value:0}).value, 0);
+    var wProject = safeFloat((document.getElementById('comp-project-weight')||{value:0}).value, 0);
+    var wFin = safeFloat((document.getElementById('comp-final-weight')||{value:0}).value, 0);
+    var sum = wMid + wAss + wQuiz + wProject + wFin;
+    if (sum !== 100) { showPopup('⚠️', 'Weights Invalid', 'Component weights must sum to 100%. Current sum: ' + sum + '%'); return; }
+    components = {
+      midterm: { weight: wMid, obtained: (document.getElementById('comp-mid-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-mid-obt').value, null), total: safeFloat((document.getElementById('comp-mid-total')||{value:100}).value,100) },
+      assignment: { weight: wAss, obtained: (document.getElementById('comp-assn-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-assn-obt').value, null), total: safeFloat((document.getElementById('comp-assn-total')||{value:100}).value,100) },
+      final: { weight: wFin, obtained: (document.getElementById('comp-final-obt')||{value:''}).value.trim() === '' ? null : safeFloat(document.getElementById('comp-final-obt').value, null), total: safeFloat((document.getElementById('comp-final-total')||{value:100}).value,100), hidden: (stage==='mid-semester') }
+    };
+  }
+
+  if (editingSubjectId !== null) {
+    var idx = subjects.findIndex(function(x) { return x.id === editingSubjectId; });
+    if (idx !== -1) {
+      subjects[idx] = { id: editingSubjectId, name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage };
+    }
+    cancelEditSubject();
+    showToast('Subject updated!', 'success');
+    // persist
+    if (typeof saveUserData === 'function') saveUserData(); else saveData();
+    renderSubjects(); renderOverview();
+  } else {
+    var newSub = { id: generateId(), name: name, marks: marks, total: total, credits: credits, system: system, mode: mode, components: components, stage: stage };
+    subjects.push(newSub);
+    // persist
+    if (typeof saveUserData === 'function') saveUserData(); else saveData();
+    renderSubjects(); renderOverview();
+    showToast('Subject added!','success');
+
+    // clear form fields
+    document.getElementById('subject-name').value = '';
+    if (document.getElementById('subject-marks')) document.getElementById('subject-marks').value = '';
+    if (document.getElementById('subject-total')) document.getElementById('subject-total').value = '100';
+    if (document.getElementById('subject-credits')) document.getElementById('subject-credits').value = '3';
+    if (document.getElementById('subject-system')) document.getElementById('subject-system').value = 'pakistan';
+    // clear component fields
+    var compIds = ['comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total'];
+    compIds.forEach(function(id){ var el = document.getElementById(id); if(el) { if(id.indexOf('weight')!==-1) { /* keep defaults */ } else if(id.indexOf('total')!==-1) { el.value = '100'; } else el.value = ''; } });
+    if (document.getElementById('rel-gpa-slider')) document.getElementById('rel-gpa-slider').value = 3; if (document.getElementById('rel-gpa-number')) document.getElementById('rel-gpa-number').value = 3.0;
+  }
+});
+
+// IMPORT button: create hidden file input and handle .json imports
+var importBtn = document.getElementById('import-subjects-btn'); if(importBtn){
+  var importInput = document.createElement('input'); importInput.type='file'; importInput.accept='.json,application/json'; importInput.style.display='none'; document.body.appendChild(importInput);
+  importBtn.addEventListener('click', function(){ importInput.click(); });
+  importInput.addEventListener('change', function(e){ var f = e.target.files && e.target.files[0]; if(!f) return; var reader = new FileReader(); reader.onload = function(ev){ try{ var data = JSON.parse(ev.target.result); if(Array.isArray(data)){ var added=0; data.forEach(function(it){ try{ if(!it || !it.name) return; var obj = { id: it.id||generateId(), name: it.name, marks: (it.marks===undefined?null:it.marks), total: safeFloat(it.total,100), credits: safeFloat(it.credits,3), system: it.system||'pakistan', mode: it.mode||localStorage.getItem('subject_mode')||'absolute', components: it.components||{}, stage: it.stage||localStorage.getItem('subject_stage')||'mid-semester' }; subjects.push(obj); added++; }catch(e){} }); if(added>0){ if(typeof saveUserData === 'function') saveUserData(); else saveData(); renderSubjects(); renderOverview(); showToast('Imported!','success'); } else { showToast('No valid subjects in file','warning'); } } else { showPopup('❌','Invalid File','JSON must be an array of subjects.'); } }catch(err){ showPopup('❌','Import Failed','Could not parse JSON file.'); } finally{ importInput.value=''; } }; reader.readAsText(f); }); }
+
+// CLEAR PANEL button: confirm then clear form inputs only
+var clearBtn = document.getElementById('clear-panel-btn'); if(clearBtn){ clearBtn.addEventListener('click', function(){ showPopup('⚠️','Clear Form','Clear all form fields in the Subjects panel?', function(){ var ids = ['subject-name','subject-marks','subject-total','subject-credits','subject-system','comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total','rel-gpa-slider','rel-gpa-number']; ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; if(el.type==='range') el.value = 3; else if(el.type==='number' && id.indexOf('total')!==-1) el.value = '100'; else if(id==='subject-credits') el.value='3'; else if(id==='subject-system') el.value='pakistan'; else el.value=''; }); if(document.getElementById('weights-status')) document.getElementById('weights-status').textContent=''; if(document.getElementById('abs-preview-pct')) document.getElementById('abs-preview-pct').textContent='—'; if(document.getElementById('abs-preview-gpa')) document.getElementById('abs-preview-gpa').textContent='—'; showToast('Form cleared!','info'); }); }); }
+
+// ============================================================
+// RENDER TIMETABLE
+// ============================================================
+function renderTimetable() {
+  timetable = timetable || [];
+  var container = document.getElementById('timetable-list');
+  container.innerHTML = '';
+  if (!timetable.length) {
+    container.innerHTML = '<div class="empty-state"><div>🗓️</div><p>No classes yet. Add your first class above!</p></div>';
+    return;
+  }
+  var dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  var sorted = timetable.slice().sort(function(a, b) {
+    if (!a || !b) return 0;
+    return dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day) || a.start.localeCompare(b.start);
+  });
+  sorted.forEach(function(t) {
+    if (!t) return;
+    var card = document.createElement('div');
+    card.className = 'tt-card';
+    card.innerHTML =
+      '<div class="tt-card-day">' + t.day + '</div>' +
+      '<div class="tt-card-subject">' + escapeHtml(t.subject) + '</div>' +
+      '<div class="tt-card-time">⏰ ' + t.start + ' – ' + t.end + '</div>' +
+      '<div class="tt-card-actions"></div>';
+
+    var editBtn = document.createElement('button');
+    editBtn.className = 'btn btn-ghost btn-sm';
+    editBtn.textContent = '✏️ Edit';
+    editBtn.addEventListener('click', function() { editTT(t.id); });
+
+    var delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-danger btn-sm';
+    delBtn.textContent = '🗑️ Delete';
+    delBtn.addEventListener('click', function() { deleteTT(t.id); });
+
+    card.querySelector('.tt-card-actions').appendChild(editBtn);
+    card.querySelector('.tt-card-actions').appendChild(delBtn);
+    container.appendChild(card);
+  });
+}
+
+function timeToMinutes(t) {
+  var parts = t.split(':');
+  return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+}
+
+function hasTimeConflict(day, start, end, excludeId) {
+  return timetable.some(function(t) {
+    if (t.id === excludeId) return false;
+    if (t.day !== day) return false;
+    var tStart = timeToMinutes(t.start);
+    var tEnd = timeToMinutes(t.end);
+    var newStart = timeToMinutes(start);
+    var newEnd = timeToMinutes(end);
+    return newStart < tEnd && newEnd > tStart;
+  });
+}
+
+function editTT(id) {
+  var t = timetable.find(function(x) { return x.id === id; });
+  if (!t) return;
+  document.getElementById('tt-subject').value = t.subject;
+  document.getElementById('tt-day').value = t.day;
+  document.getElementById('tt-start').value = t.start;
+  document.getElementById('tt-end').value = t.end;
+  editingTTId = id;
+  document.getElementById('add-tt-btn').textContent = '✅ Update Class';
+  document.getElementById('tt-edit-notice').classList.add('show');
+  switchTab('timetable');
+  document.getElementById('tt-subject').focus();
+  showToast('Editing class — update and click Update Class', 'info');
+}
+
+function deleteTT(id) {
+  showPopup('🗑️', 'Delete Class', 'Remove this class from your timetable?', function() {
+    timetable = timetable.filter(function(x) { return x.id !== id; });
+    saveData();
+    renderTimetable();
+    renderOverview();
+    showToast('Class removed!', 'info');
+  });
+}
+
+function cancelEditTT() {
+  editingTTId = null;
+  document.getElementById('add-tt-btn').textContent = '+ Add Class';
+  document.getElementById('tt-edit-notice').classList.remove('show');
+  document.getElementById('tt-subject').value = '';
+  document.getElementById('tt-start').value = '';
+  document.getElementById('tt-end').value = '';
+}
+
+document.getElementById('cancel-tt-edit-btn').addEventListener('click', cancelEditTT);
+
+document.getElementById('add-tt-btn').addEventListener('click', function() {
+  var subject = document.getElementById('tt-subject').value.trim();
+  var day = document.getElementById('tt-day').value;
+  var start = document.getElementById('tt-start').value;
+  var end = document.getElementById('tt-end').value;
+
+  if (!subject) { showPopup('⚠️', 'Missing Info', 'Please enter a subject name.'); return; }
+  if (!start || !end) { showPopup('⚠️', 'Missing Time', 'Please set both start and end time.'); return; }
+  if (timeToMinutes(end) <= timeToMinutes(start)) {
+    showPopup('⚠️', 'Invalid Time', 'End time must be after start time.');
+    return;
+  }
+
+  var conflict = hasTimeConflict(day, start, end, editingTTId || null);
+  if (conflict) {
+    showPopup('🚨', 'Time Conflict!', 'This time slot overlaps with another class on ' + day + '. Please choose a different time.');
+    return;
+  }
+
+  if (editingTTId !== null) {
+    var idx = timetable.findIndex(function(x) { return x.id === editingTTId; });
+    if (idx !== -1) {
+      timetable[idx] = { id: editingTTId, subject: subject, day: day, start: start, end: end };
+    }
+    cancelEditTT();
+    showToast('Class updated! ✏️', 'success');
+  } else {
+    timetable.push({ id: generateId(), subject: subject, day: day, start: start, end: end });
+    showToast('Class added! 🗓️', 'success');
+    document.getElementById('tt-subject').value = '';
+    document.getElementById('tt-start').value = '';
+    document.getElementById('tt-end').value = '';
+  }
+  saveData();
+  renderTimetable();
+  renderOverview();
+});
+
+// ============================================================
+// RENDER CHARTS
+// ============================================================
+function renderCharts() {
+  var scored = subjects.filter(function(s) {
+    return s.marks !== null && s.marks !== undefined && s.marks !== '';
+  });
+  var labels = scored.map(function(s) { return s.name; });
+  var values = scored.map(function(s) {
+    return ((safeFloat(s.marks, 0) / safeFloat(s.total, 100)) * 100).toFixed(1);
+  });
+
+  var colors = ['#6c63ff','#22c55e','#f59e0b','#ef4444','#8b85ff','#a78bfa','#38bdf8','#f472b6'];
+
+  if (charts.bar) { charts.bar.destroy(); charts.bar = null; }
+  if (charts.pie) { charts.pie.destroy(); charts.pie = null; }
+
+  var barCtx = document.getElementById('bar-chart').getContext('2d');
+  charts.bar = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: labels.length ? labels : ['No Data'],
+      datasets: [{
+        label: 'Score %',
+        data: values.length ? values : [0],
+        backgroundColor: labels.length ? labels.map(function(_, i) { return colors[i % colors.length]; }) : ['rgba(108,99,255,0.4)'],
+        borderRadius: 8,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: '#9090aa' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        x: { ticks: { color: '#9090aa' }, grid: { display: false } }
+      }
+    }
+  });
+
+  var pieCtx = document.getElementById('pie-chart').getContext('2d');
+  charts.pie = new Chart(pieCtx, {
+    type: 'doughnut',
+    data: {
+      labels: labels.length ? labels : ['No Data'],
+      datasets: [{
+        data: values.length ? values : [1],
+        backgroundColor: colors,
+        borderWidth: 0,
+        hoverOffset: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#9090aa', padding: 12, font: { size: 12 } } } },
+      cutout: '60%'
+    }
+  });
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  renderOverview();
+  renderSubjects();
+  renderTimetable();
+  if (document.getElementById('panel-analytics').classList.contains('active')) renderCharts();
+}
+
+// ============================================================
+// TOOLS
+// ============================================================
+document.getElementById('calc-btn').addEventListener('click', function() {
+  var marks = safeFloat(document.getElementById('calc-marks').value, null);
+  var system = document.getElementById('calc-system').value;
+  if (marks === null || marks < 0 || marks > 100) {
+    showPopup('⚠️', 'Invalid Marks', 'Please enter a value between 0 and 100.');
+    return;
+  }
+  var grade = pctToGrade(marks, system);
+  var gpa = pctToGPA(marks, system);
+  var result = document.getElementById('calc-result');
+  result.innerHTML =
+    '<b>Score:</b> ' + marks.toFixed(1) + '%<br>' +
+    '<b>Grade:</b> ' + grade + '<br>' +
+    '<b>GPA Points:</b> ' + gpa.toFixed(2);
+  result.classList.add('show');
+});
+
+document.getElementById('countdown-btn').addEventListener('click', function() {
+  var name = document.getElementById('exam-name').value.trim() || 'Exam';
+  var dateVal = document.getElementById('exam-date').value;
+  if (!dateVal) { showPopup('⚠️', 'No Date', 'Please select an exam date.'); return; }
+  if (countdownTimer) clearInterval(countdownTimer);
+  var display = document.getElementById('countdown-display');
+  display.textContent = 'Starting...';
+  countdownTimer = setInterval(function() {
+    var target = new Date(dateVal + 'T00:00:00');
+    var now = new Date();
+    var diff = target - now;
+    if (diff <= 0) {
+      clearInterval(countdownTimer);
+      display.textContent = name + ' is today! 🎓';
+      return;
+    }
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var s = Math.floor((diff % 60000) / 1000);
+    display.textContent = name + ': ' + d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
+  }, 1000);
+  showToast('Countdown started for ' + name + '!', 'success');
+});
+
+// ============================================================
+// TARGET GPA
+// ============================================================
+document.getElementById('set-target-btn').addEventListener('click', function() {
+  var val = safeFloat(document.getElementById('target-gpa-input').value, null);
+  if (val === null || val < 0 || val > 4) {
+    showPopup('⚠️', 'Invalid GPA', 'Please enter a GPA between 0.0 and 4.0.');
+    return;
+  }
+  targetGPA = val;
+  saveData();
+  renderOverview();
+  showToast('Target GPA set to ' + val.toFixed(2) + '! 🎯', 'success');
+  document.getElementById('target-gpa-input').value = '';
+});
+
+// ============================================================
+// AUTH
+// ============================================================
+var _goReg = document.getElementById('go-register'); if(_goReg) _goReg.addEventListener('click', function(){ showScreen('register-screen'); });
+var _goLog = document.getElementById('go-login'); if(_goLog) _goLog.addEventListener('click', function(){ showScreen('login-screen'); });
+
+document.getElementById('register-btn').addEventListener('click', function() {
+  var username = document.getElementById('reg-username').value.trim();
+  var email = document.getElementById('reg-email').value.trim();
+  var pass = document.getElementById('reg-password').value.trim();
+  if (!username || !email || !pass) { showPopup('⚠️', 'Missing Info', 'Please fill in all fields.'); return; }
+  if (pass.length < 6) { showPopup('⚠️', 'Weak Password', 'Password must be at least 6 characters.'); return; }
+  if (!email.includes('@')) { showPopup('⚠️', 'Invalid Email', 'Please enter a valid email address.'); return; }
+  users = users || [];
+  if (users.find(function(u) { return u && u.email === email; })) {
+    showPopup('❌', 'Already Registered', 'This email is already registered. Please login.');
+    return;
+  }
+  users.push({ username: username, email: email, password: pass });
+  localStorage.setItem('ga_users', JSON.stringify(users));
+  showPopup('✅', 'Account Created!', 'Your account is ready. Please login now.');
+  showScreen('login-screen');
+  document.getElementById('reg-username').value = '';
+  document.getElementById('reg-email').value = '';
+  document.getElementById('reg-password').value = '';
+});
+
+document.getElementById('login-btn').addEventListener('click', function() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass = document.getElementById('login-password').value.trim();
+  if (!email || !pass) { showPopup('⚠️', 'Missing Info', 'Please enter your email and password.'); return; }
+  users = users || [];
+  var user = users.find(function(u) { return u && u.email === email && u.password === pass; });
+  if (!user) { showPopup('❌', 'Login Failed', 'Incorrect email or password. Please try again.'); return; }
+  currentUser = user;
+  localStorage.setItem('ga_current', JSON.stringify(user));
+  loadUserData();
+  document.getElementById('user-badge').textContent = '👤 ' + user.username;
+  showScreen('dashboard-screen');
+  renderAll();
+  showToast('Welcome back, ' + user.username + '! 👋', 'success');
+});
+
+document.getElementById('logout-btn').addEventListener('click', function() {
+  showPopup('👋', 'Logout', 'Are you sure you want to logout?', function() {
+    saveData();
+    currentUser = null;
+    localStorage.removeItem('ga_current');
+    subjects = []; timetable = []; targetGPA = 0;
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    showScreen('login-screen');
+    showToast('Logged out successfully.', 'info');
+  });
+});
+
+// Enter key on login
+document.getElementById('login-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('login-btn').click();
+});
+document.getElementById('login-email').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('login-btn').click();
+});
+
+// ============================================================
+// HELPER
+// ============================================================
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// SUBJECT SETUP FEATURE
+// ============================================================
+function generateSubjectFields(count) {
+  try {
+    var container = document.getElementById('dynamic-subject-fields');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    var validCount = Math.max(1, Math.min(20, parseInt(count) || 0));
+    
+    for (var i = 0; i < validCount; i++) {
+      var row = document.createElement('div');
+      row.className = 'dynamic-subject-row';
+      row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;margin-bottom:12px;align-items:flex-end;';
+      
+      var nameLabel = document.createElement('label');
+      nameLabel.className = 'form-label';
+      nameLabel.textContent = i === 0 ? 'Subject Name *' : '';
+      nameLabel.style.marginBottom = '4px';
+      
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text';
+      nameInput.className = 'input-field setup-subject-name';
+      nameInput.placeholder = 'Subject ' + (i + 1);
+      nameInput.style.width = '100%';
+      
+      var marksLabel = document.createElement('label');
+      marksLabel.className = 'form-label';
+      marksLabel.textContent = i === 0 ? 'Current Marks (optional)' : '';
+      marksLabel.style.marginBottom = '4px';
+      
+      var marksInput = document.createElement('input');
+      marksInput.type = 'number';
+      marksInput.className = 'input-field setup-subject-marks';
+      marksInput.placeholder = 'e.g. 85';
+      marksInput.min = '0';
+      marksInput.max = '100';
+      marksInput.step = '0.1';
+      marksInput.style.width = '100%';
+      
+      var totalLabel = document.createElement('label');
+      totalLabel.className = 'form-label';
+      totalLabel.textContent = i === 0 ? 'Total Marks (optional)' : '';
+      totalLabel.style.marginBottom = '4px';
+      
+      var totalInput = document.createElement('input');
+      totalInput.type = 'number';
+      totalInput.className = 'input-field setup-subject-total';
+      totalInput.placeholder = '100';
+      totalInput.min = '1';
+      totalInput.step = '0.1';
+      totalInput.value = '100';
+      totalInput.style.width = '100%';
+      
+      var deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn btn-danger btn-sm';
+      deleteBtn.textContent = '🗑️ Delete';
+      deleteBtn.style.marginBottom = i === 0 ? '0' : '0';
+      deleteBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        row.remove();
+      });
+      
+      var nameWrapper = document.createElement('div');
+      nameWrapper.appendChild(nameLabel);
+      nameWrapper.appendChild(nameInput);
+      
+      var marksWrapper = document.createElement('div');
+      marksWrapper.appendChild(marksLabel);
+      marksWrapper.appendChild(marksInput);
+      
+      var totalWrapper = document.createElement('div');
+      totalWrapper.appendChild(totalLabel);
+      totalWrapper.appendChild(totalInput);
+      
+      row.appendChild(nameWrapper);
+      row.appendChild(marksWrapper);
+      row.appendChild(totalWrapper);
+      row.appendChild(deleteBtn);
+      
+      container.appendChild(row);
+    }
+    
+    document.getElementById('dynamic-subject-fields-container').style.display = 'block';
+  } catch (e) {
+    console.error('Error generating subject fields:', e);
+    showPopup('❌', 'Error', 'Failed to generate subject fields.');
+  }
+}
+
+function addDynamicSubject() {
+  try {
+    var container = document.getElementById('dynamic-subject-fields');
+    if (!container) return;
+    
+    var rows = container.querySelectorAll('.dynamic-subject-row');
+    var nextIndex = rows.length;
+    
+    if (nextIndex >= 20) {
+      showPopup('⚠️', 'Limit Reached', 'You can add maximum 20 subjects. Delete some to add more.');
+      return;
+    }
+    
+    var row = document.createElement('div');
+    row.className = 'dynamic-subject-row';
+    row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;margin-bottom:12px;align-items:flex-end;';
+    
+    var nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'input-field setup-subject-name';
+    nameInput.placeholder = 'Subject ' + (nextIndex + 1);
+    nameInput.style.width = '100%';
+    
+    var marksInput = document.createElement('input');
+    marksInput.type = 'number';
+    marksInput.className = 'input-field setup-subject-marks';
+    marksInput.placeholder = 'e.g. 85';
+    marksInput.min = '0';
+    marksInput.max = '100';
+    marksInput.step = '0.1';
+    marksInput.style.width = '100%';
+    
+    var totalInput = document.createElement('input');
+    totalInput.type = 'number';
+    totalInput.className = 'input-field setup-subject-total';
+    totalInput.placeholder = '100';
+    totalInput.min = '1';
+    totalInput.step = '0.1';
+    totalInput.value = '100';
+    totalInput.style.width = '100%';
+    
+    var deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn btn-danger btn-sm';
+    deleteBtn.textContent = '🗑️ Delete';
+    deleteBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      row.remove();
+    });
+    
+    row.appendChild(nameInput);
+    row.appendChild(marksInput);
+    row.appendChild(totalInput);
+    row.appendChild(deleteBtn);
+    
+    container.appendChild(row);
+    nameInput.focus();
+    showToast('New subject field added! 📝', 'info');
+  } catch (e) {
+    console.error('Error adding subject:', e);
+    showPopup('❌', 'Error', 'Failed to add new subject field.');
+  }
+}
+
+function saveSubjectsSafely() {
+  try {
+    var container = document.getElementById('dynamic-subject-fields');
+    if (!container) return;
+    
+    var rows = container.querySelectorAll('.dynamic-subject-row');
+    if (!rows.length) {
+      showPopup('⚠️', 'No Subjects', 'Please create at least one subject field to save.');
+      return;
+    }
+    
+    var addedSubjects = [];
+    var errors = [];
+    
+    rows.forEach(function(row, idx) {
+      try {
+        var nameInput = row.querySelector('.setup-subject-name');
+        var marksInput = row.querySelector('.setup-subject-marks');
+        var totalInput = row.querySelector('.setup-subject-total');
+        
+        var name = nameInput ? nameInput.value.trim() : '';
+        var marksStr = marksInput ? marksInput.value.trim() : '';
+        var totalStr = totalInput ? totalInput.value.trim() : '100';
+        
+        if (!name) {
+          errors.push('Subject ' + (idx + 1) + ': Name is required.');
+          return;
+        }
+        
+        var total = parseFloat(totalStr) || 100;
+        if (total <= 0) {
+          errors.push('Subject ' + (idx + 1) + ': Total marks must be greater than 0.');
+          return;
+        }
+        
+        var marks = null;
+        if (marksStr !== '') {
+          marks = parseFloat(marksStr);
+          if (isNaN(marks) || marks < 0 || marks > total) {
+            errors.push('Subject ' + (idx + 1) + ': Marks must be between 0 and ' + total + '.');
+            return;
+          }
+        }
+        
+        addedSubjects.push({
+          id: generateId(),
+          name: name,
+          marks: marks,
+          total: total,
+          credits: 3,
+          system: 'pakistan'
+        });
+      } catch (e) {
+        console.error('Error processing subject row', e);
+        errors.push('Subject ' + (idx + 1) + ': Processing error.');
+      }
+    });
+    
+    if (errors.length > 0) {
+      var errorMsg = errors.join('\n');
+      showPopup('⚠️', 'Validation Errors', errorMsg.substring(0, 200) + (errorMsg.length > 200 ? '...' : ''));
+      return;
+    }
+    
+    if (addedSubjects.length === 0) {
+      showPopup('⚠️', 'No Valid Subjects', 'Please fill in at least one valid subject.');
+      return;
+    }
+    
+    subjects = subjects.concat(addedSubjects);
+    saveData();
+    renderSubjects();
+    renderAll();
+    
+    document.getElementById('setup-subject-count').value = '1';
+    document.getElementById('dynamic-subject-fields').innerHTML = '';
+    document.getElementById('dynamic-subject-fields-container').style.display = 'none';
+    
+    showToast('✅ ' + addedSubjects.length + ' subject(s) added successfully!', 'success');
+    showPopup('✅', 'Success!', 'All subjects have been saved safely. Your data is preserved.');
+  } catch (e) {
+    console.error('Error saving subjects:', e);
+    showPopup('❌', 'Error', 'An unexpected error occurred. Your data is safe. Please try again.');
+  }
+}
+
+function initSubjectSetup() {
+  try {
+    var generateBtn = document.getElementById('generate-subject-fields-btn');
+    var addBtn = document.getElementById('add-another-subject-btn');
+    var saveBtn = document.getElementById('save-all-subjects-btn');
+    var countInput = document.getElementById('setup-subject-count');
+    
+    if (generateBtn) {
+      generateBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var count = parseInt(countInput.value) || 1;
+        if (count < 1 || count > 20 || !Number.isInteger(count)) {
+          showPopup('⚠️', 'Invalid Number', 'Please enter a number between 1 and 20.');
+          return;
+        }
+        generateSubjectFields(count);
+        showToast('📝 ' + count + ' subject field(s) generated!', 'info');
+      });
+    }
+    
+    if (addBtn) {
+      addBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        addDynamicSubject();
+      });
+    }
+    
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        saveSubjectsSafely();
+      });
+    }
+    
+    if (countInput) {
+      countInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          generateBtn.click();
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Error initializing subject setup:', e);
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(function init() {
+  users = parseJSON(localStorage.getItem('ga_users'), []) || [];
+  var saved = parseJSON(localStorage.getItem('ga_current'), null);
+  if (saved && users && users.length > 0) {
+    var found = users.find(function(u) { return u && u.email === saved.email && u.password === saved.password; });
+    if (found) {
+      currentUser = found;
+      loadUserData();
+      document.getElementById('user-badge').textContent = '👤 ' + found.username;
+      showScreen('dashboard-screen');
+      renderAll();
+      initSubjectSetup();
+      return;
+    }
+  }
+  initSubjectSetup();
+  showScreen('login-screen');
+})();
+</script>
+<!-- Attach login/register handlers once after all scripts load; minimal and non-invasive -->
+<script>
+window.addEventListener('load', function(){
+  try{
+    var reg = document.getElementById('register-btn'); if(reg) reg.addEventListener('click', function(){
+      var username = (document.getElementById('reg-username')||{value:''}).value.trim();
+      var email = (document.getElementById('reg-email')||{value:''}).value.trim();
+      var pass = (document.getElementById('reg-password')||{value:''}).value.trim();
+      if(!username||!email||!pass){ showPopup('⚠️','Missing Info','Please fill in all fields.'); return; }
+      if(pass.length<6){ showPopup('⚠️','Weak Password','Password must be at least 6 characters.'); return; }
+      users = users || parseJSON(localStorage.getItem('ga_users'), []);
+      if(users.find(function(u){ return u && u.email===email;})){ showPopup('❌','Already Registered','This email is already registered. Please login.'); return; }
+      users.push({ username: username, email: email, password: pass });
+      localStorage.setItem('ga_users', JSON.stringify(users));
+      showPopup('✅','Account Created!','Your account is ready. Please login now.');
+      showScreen('login-screen');
+      var f; f = document.getElementById('reg-username'); if(f) f.value=''; f = document.getElementById('reg-email'); if(f) f.value=''; f = document.getElementById('reg-password'); if(f) f.value='';
+    });
+
+    var login = document.getElementById('login-btn'); if(login) login.addEventListener('click', function(){
+      var email = (document.getElementById('login-email')||{value:''}).value.trim();
+      var pass = (document.getElementById('login-password')||{value:''}).value.trim();
+      if(!email||!pass){ showPopup('⚠️','Missing Info','Please enter your email and password.'); return; }
+      users = users || parseJSON(localStorage.getItem('ga_users'), []);
+      var user = users.find(function(u){ return u && u.email===email && u.password===pass; });
+      if(!user){ showPopup('❌','Login Failed','Incorrect email or password. Please try again.'); return; }
+      currentUser = user; localStorage.setItem('ga_current', JSON.stringify(user));
+      try{ loadUserData(); }catch(e){ subjects = parseJSON(localStorage.getItem('ga_subjects_' + user.email), []); timetable = parseJSON(localStorage.getItem('ga_timetable_' + user.email), []); targetGPA = safeFloat(localStorage.getItem('ga_target_' + user.email), 0); }
+      var ub = document.getElementById('user-badge'); if(ub) ub.textContent = '👤 ' + user.username;
+      showScreen('dashboard-screen'); try{ renderAll(); }catch(e){}
+      showToast('Welcome back, ' + user.username + '! 👋', 'success');
+      var e1 = document.getElementById('login-email'); if(e1) e1.value=''; e1 = document.getElementById('login-password'); if(e1) e1.value='';
+    });
+
+    var goReg = document.getElementById('go-register'); if(goReg) goReg.addEventListener('click', function(e){ e.preventDefault(); showScreen('register-screen'); });
+    var goLog = document.getElementById('go-login'); if(goLog) goLog.addEventListener('click', function(e){ e.preventDefault(); showScreen('login-screen'); });
+  }catch(err){ console.error('Login/Register attach failed', err); }
+});
+</script>
+</body>
+</html>
