@@ -231,6 +231,30 @@ select.input-field{cursor:pointer;}
 .sound-toggle-btn{min-width:38px;padding:5px 10px;font-size:16px;line-height:1;border-radius:20px;background:var(--bg3);border:1px solid var(--border);cursor:pointer;color:var(--text2);}
 .sound-toggle-btn:hover{border-color:rgba(108,99,255,0.4);color:var(--text);}
 .sound-toggle-btn.muted{opacity:0.65;}
+.panic-toggle-btn{padding:5px 12px;font-size:12px;font-weight:700;border-radius:20px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.45);color:var(--red);cursor:pointer;white-space:nowrap;}
+.panic-toggle-btn:hover{background:rgba(239,68,68,0.2);}
+.panic-toggle-btn.urgent{animation:panicPulse 1.2s ease infinite;}
+@keyframes panicPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.35);}50%{box-shadow:0 0 0 6px rgba(239,68,68,0);}}
+.panic-overlay{display:none;position:fixed;inset:0;z-index:700;background:rgba(8,0,0,0.92);backdrop-filter:blur(8px);align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+.panic-overlay.active{display:flex;}
+.panic-panel{width:100%;max-width:760px;background:var(--card);border:2px solid rgba(239,68,68,0.45);border-radius:20px;padding:22px;margin:auto;animation:slideUp 0.3s ease;box-shadow:0 0 60px rgba(239,68,68,0.15);}
+.panic-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.panic-header h2{margin:0;font-family:'Syne',sans-serif;font-size:22px;color:var(--red);}
+.panic-header p{margin:4px 0 0 0;font-size:13px;color:var(--text2);}
+.panic-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px;}
+.panic-stat{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;}
+.panic-stat-label{font-size:11px;color:var(--text2);}
+.panic-stat-value{font-size:18px;font-weight:700;margin-top:2px;}
+.panic-section{margin-bottom:16px;}
+.panic-section h3{margin:0 0 8px 0;font-size:14px;}
+.panic-subject-list{display:flex;flex-direction:column;gap:8px;}
+.panic-subject-item{padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;border-left:4px solid var(--red);}
+.panic-subject-item.medium{border-left-color:var(--amber);}
+.panic-subject-item.low{border-left-color:var(--green);}
+.panic-subject-name{font-weight:700;font-size:14px;margin-bottom:4px;}
+.panic-subject-meta{font-size:12px;color:var(--text2);line-height:1.5;}
+.panic-checklist{margin:0;padding-left:18px;font-size:13px;color:var(--text2);line-height:1.7;}
+.panic-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
 /* POPUP */
 .popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:600;align-items:center;justify-content:center;padding:20px;}
 .popup-overlay.active{display:flex;}
@@ -337,6 +361,7 @@ select.input-field{cursor:pointer;}
   <div class="topbar">
     <span class="topbar-brand">🌍 GradeAtlas</span>
     <div class="topbar-right">
+      <button type="button" class="panic-toggle-btn" id="panic-toggle-btn" title="Emergency study plan">🚨 Panic</button>
       <button type="button" class="sound-toggle-btn" id="sound-toggle-btn" title="Sounds on — click to mute">🔊</button>
       <span class="user-badge" id="user-badge">👤 User</span>
       <button class="btn btn-ghost btn-sm" id="logout-btn">Logout</button>
@@ -1222,6 +1247,26 @@ select.input-field{cursor:pointer;}
   </nav>
 </div>
 
+<!-- PANIC MODE -->
+<div id="panic-overlay" class="panic-overlay">
+  <div class="panic-panel">
+    <div class="panic-header">
+      <div>
+        <h2>🚨 Panic Mode</h2>
+        <p>Emergency study plan — focus on what matters most before finals.</p>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="panic-close-btn">✕ Close</button>
+    </div>
+    <div id="panic-content"></div>
+    <div class="panic-actions">
+      <button type="button" class="btn btn-primary btn-sm" id="panic-action-schedule">🤖 AI Schedule</button>
+      <button type="button" class="btn btn-sm" id="panic-action-analytics">📈 Analytics</button>
+      <button type="button" class="btn btn-sm" id="panic-action-predictor">🎯 Predictor</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="panic-action-close">I'm On It</button>
+    </div>
+  </div>
+</div>
+
 <!-- POPUP -->
 <div id="popup-overlay" class="popup-overlay">
   <div class="popup-box">
@@ -1254,6 +1299,7 @@ var aiStudyMode = false;
 var gamification = { xp: 0, badges: [] };
 var soundEnabled = true;
 var _soundSessionKeys = {};
+var panicModeActive = false;
 var countdownTimer = null;
 var editingSubjectId = null;
 var editingTTId = null;
@@ -2213,6 +2259,145 @@ function playAchievementSound() { playSound('achievement', 'achievement'); }
 function playBuzzerSound() { playSound('buzzer', 'buzzer'); }
 
 // ============================================================
+// PANIC MODE (Part 13)
+// ============================================================
+function getExamKey() {
+  return currentUser ? 'ga_exam_' + currentUser.email : null;
+}
+
+function getExamCountdownInfo() {
+  if (!currentUser) return null;
+  var raw = localStorage.getItem(getExamKey());
+  if (!raw) return null;
+  var data = parseJSON(raw, null);
+  if (!data || typeof data !== 'object' || !data.date) return null;
+  var exam = new Date(data.date + 'T00:00:00');
+  var now = new Date();
+  now.setHours(0, 0, 0, 0);
+  var days = Math.ceil((exam - now) / 86400000);
+  return { name: data.name || 'Exam', days: days, date: data.date };
+}
+
+function buildPanicChecklist(report, priorities) {
+  var items = [];
+  if (!subjects.length) {
+    items.push('Add your subjects with current marks in the Subjects tab.');
+    return items;
+  }
+  if (report.atRiskCount > 0) {
+    items.push('Review ' + report.atRiskCount + ' at-risk subject(s) and block daily study time for each.');
+  }
+  if (priorities.length) {
+    var topName = priorities[0].subject ? priorities[0].subject.name : priorities[0].name;
+    items.push('Start with ' + topName + ' — highest urgency score (' + priorities[0].score + ').');
+  }
+  if (targetGPA > 0 && report.overallGpa < targetGPA) {
+    items.push('Use the Target GPA Predictor to see final marks needed to recover your semester GPA.');
+  }
+  var exam = getExamCountdownInfo();
+  if (exam && exam.days >= 0 && exam.days <= 14) {
+    items.push('Only ' + exam.days + ' day(s) until ' + exam.name + ' — prioritize weak subjects first.');
+  } else if (!exam) {
+    items.push('Set an exam date in Tools → Exam Countdown to unlock deadline tracking.');
+  }
+  items.push('Generate an AI study schedule in Timetable for a structured weekly plan.');
+  items.push('Enable AI Study Priority Mode on Timetable to see focus tips on each class.');
+  return items;
+}
+
+function renderPanicMode() {
+  var content = document.getElementById('panic-content');
+  if (!content) return;
+
+  if (!subjects.length) {
+    content.innerHTML = '<div class="predictor-empty">Add subjects first, then open Panic Mode for an emergency study plan.</div>';
+    return;
+  }
+
+  var report = analyzeAcademicRisk();
+  var priorities = getStudyPriorityEntries().slice(0, 5);
+  var goal = targetGPA > 0 ? targetGPA : 3.0;
+  var exam = getExamCountdownInfo();
+  var checklist = buildPanicChecklist(report, priorities);
+
+  var examHtml = '';
+  if (exam) {
+    var examLabel = exam.days < 0 ? 'Passed' : exam.days === 0 ? 'Today!' : exam.days + ' days';
+    var examColor = exam.days >= 0 && exam.days <= 7 ? 'var(--red)' : 'var(--text)';
+    examHtml = '<div class="panic-stat"><div class="panic-stat-label">' + escapeHtml(exam.name) + '</div><div class="panic-stat-value" style="color:' + examColor + ';">' + examLabel + '</div></div>';
+  }
+
+  var statsHtml =
+    '<div class="panic-stat"><div class="panic-stat-label">Semester Risk</div><div class="panic-stat-value" style="color:var(--red);">' + escapeHtml(report.semesterTier.label) + '</div></div>' +
+    '<div class="panic-stat"><div class="panic-stat-label">Current GPA</div><div class="panic-stat-value">' + report.overallGpa.toFixed(2) + '</div></div>' +
+    '<div class="panic-stat"><div class="panic-stat-label">At Risk</div><div class="panic-stat-value" style="color:var(--red);">' + report.atRiskCount + '</div></div>' +
+    '<div class="panic-stat"><div class="panic-stat-label">Target GPA</div><div class="panic-stat-value">' + (targetGPA > 0 ? targetGPA.toFixed(2) : '—') + '</div></div>' +
+    examHtml;
+
+  var subjectsHtml = priorities.length ? priorities.map(function(e, i) {
+    var s = e.subject;
+    var tierClass = e.score >= 75 ? '' : e.score >= 55 ? ' medium' : e.score >= 35 ? ' medium' : ' low';
+    var pred = s ? predictFinalForSubject(s, goal) : null;
+    var predText = pred ? pred.message : 'Add marks to see final requirements.';
+    var gpa = s ? getSubjectGpa(s) : null;
+    var gpaText = gpa !== null ? 'GPA ' + gpa.toFixed(2) : 'No GPA yet';
+    return '<div class="panic-subject-item' + tierClass + '">' +
+      '<div class="panic-subject-name">#' + (i + 1) + ' ' + escapeHtml(e.subject ? e.subject.name : e.name) + ' · ' + e.tier.label + ' (' + e.score + ')</div>' +
+      '<div class="panic-subject-meta">' + escapeHtml(gpaText) + ' • ' + escapeHtml(e.reasons[0] || 'Review this subject') + '<br>' + escapeHtml(predText) + '</div>' +
+    '</div>';
+  }).join('') : '<div class="predictor-empty">No priority data yet.</div>';
+
+  content.innerHTML =
+    '<div class="panic-stats">' + statsHtml + '</div>' +
+    '<div class="panic-section"><h3>🔥 Urgent Subjects (Study These First)</h3><div class="panic-subject-list">' + subjectsHtml + '</div></div>' +
+    '<div class="panic-section"><h3>✅ Emergency Action Plan</h3><ul class="panic-checklist">' + checklist.map(function(item) {
+      return '<li>' + escapeHtml(item) + '</li>';
+    }).join('') + '</ul></div>';
+}
+
+function updatePanicToggleUI() {
+  var btn = document.getElementById('panic-toggle-btn');
+  if (!btn) return;
+  btn.classList.toggle('active', panicModeActive);
+  if (!currentUser || !subjects.length) {
+    btn.classList.remove('urgent');
+    return;
+  }
+  var report = analyzeAcademicRisk();
+  btn.classList.toggle('urgent', !panicModeActive && (report.semesterTier.class === 'risk-critical' || report.semesterTier.class === 'risk-high'));
+}
+
+function openPanicMode() {
+  if (!currentUser) {
+    showPopup('⚠️', 'Login Required', 'Please log in to use Panic Mode.');
+    return;
+  }
+  panicModeActive = true;
+  renderPanicMode();
+  var overlay = document.getElementById('panic-overlay');
+  if (overlay) overlay.classList.add('active');
+  aiStudyMode = true;
+  if (currentUser) localStorage.setItem('ga_ai_study_' + currentUser.email, '1');
+  var aiToggle = document.getElementById('ai-study-mode');
+  if (aiToggle) aiToggle.checked = true;
+  updatePanicToggleUI();
+  playSound('buzzer', 'panic_open');
+  showToast('Panic Mode ON — AI Study Priority enabled', 'warning');
+}
+
+function closePanicMode() {
+  panicModeActive = false;
+  var overlay = document.getElementById('panic-overlay');
+  if (overlay) overlay.classList.remove('active');
+  updatePanicToggleUI();
+}
+
+function togglePanicMode() {
+  if (panicModeActive) closePanicMode();
+  else openPanicMode();
+}
+
+// ============================================================
 // TARGET ACHIEVEMENT (Part 8)
 // ============================================================
 function showAchievementPopup(title, msg, skipSound) {
@@ -2813,6 +2998,7 @@ function renderOverview() {
   }
   updateSubjectsSummary();
   renderGamification();
+  updatePanicToggleUI();
 }
 
 // ============================================================
@@ -3778,6 +3964,9 @@ document.getElementById('countdown-btn').addEventListener('click', function() {
     display.textContent = name + ': ' + d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
   }, 1000);
   showToast('Countdown started for ' + name + '!', 'success');
+  if (currentUser) {
+    localStorage.setItem(getExamKey(), JSON.stringify({ name: name, date: dateVal }));
+  }
 });
 
 // ============================================================
@@ -3907,6 +4096,36 @@ if (soundToggleBtn) {
     } else {
       showToast('Sounds muted 🔇', 'info');
     }
+  });
+}
+
+var panicToggleBtn = document.getElementById('panic-toggle-btn');
+if (panicToggleBtn) panicToggleBtn.addEventListener('click', togglePanicMode);
+var panicCloseBtn = document.getElementById('panic-close-btn');
+if (panicCloseBtn) panicCloseBtn.addEventListener('click', closePanicMode);
+var panicActionClose = document.getElementById('panic-action-close');
+if (panicActionClose) panicActionClose.addEventListener('click', closePanicMode);
+var panicActionSchedule = document.getElementById('panic-action-schedule');
+if (panicActionSchedule) {
+  panicActionSchedule.addEventListener('click', function() {
+    closePanicMode();
+    switchTab('timetable');
+    runAIGenerateTimetable();
+  });
+}
+var panicActionAnalytics = document.getElementById('panic-action-analytics');
+if (panicActionAnalytics) {
+  panicActionAnalytics.addEventListener('click', function() {
+    closePanicMode();
+    switchTab('analytics');
+  });
+}
+var panicActionPredictor = document.getElementById('panic-action-predictor');
+if (panicActionPredictor) {
+  panicActionPredictor.addEventListener('click', function() {
+    closePanicMode();
+    switchTab('tools');
+    renderPredictor();
   });
 }
 
