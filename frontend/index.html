@@ -211,6 +211,23 @@ select.input-field{cursor:pointer;}
 .ai-timetable-bar .btn{white-space:nowrap;}
 .tt-card.ai-generated{border-style:dashed;}
 .tt-card-ai-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--primary2);margin-bottom:4px;}
+.gamification-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;}
+.gamification-header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+.gamification-level{text-align:center;min-width:64px;padding:10px 12px;background:linear-gradient(135deg,rgba(108,99,255,0.2),rgba(108,99,255,0.05));border:1px solid rgba(108,99,255,0.35);border-radius:14px;}
+.gamification-level-num{display:block;font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--primary2);line-height:1;}
+.gamification-level-label{display:block;font-size:11px;color:var(--text2);margin-top:2px;text-transform:uppercase;letter-spacing:0.5px;}
+.gamification-xp-wrap{flex:1;min-width:180px;}
+.gamification-xp-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;}
+.gamification-xp-next{font-size:12px;color:var(--text2);}
+.gamification-badge-count{font-size:13px;color:var(--text2);white-space:nowrap;}
+.gam-badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:10px;}
+.gam-badge-item{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;text-align:center;}
+.gam-badge-item.unlocked{border-color:rgba(108,99,255,0.35);background:rgba(108,99,255,0.08);}
+.gam-badge-item.locked{opacity:0.45;filter:grayscale(0.6);}
+.gam-badge-icon{font-size:28px;line-height:1;}
+.gam-badge-name{font-size:11px;font-weight:700;line-height:1.3;}
+.gam-badge-reward{font-size:10px;color:var(--text2);}
+.user-level-tag{font-size:11px;color:var(--primary2);font-weight:700;margin-left:4px;}
 /* POPUP */
 .popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:600;align-items:center;justify-content:center;padding:20px;}
 .popup-overlay.active{display:flex;}
@@ -368,6 +385,26 @@ select.input-field{cursor:pointer;}
             <div class="stat-card"><div class="stat-label">Weakest</div><div id="stat-weakest" class="stat-value">—</div></div>
             <div class="stat-card"><div class="stat-label">Classes</div><div id="stat-classes" class="stat-value">0</div></div>
             <div class="stat-card"><div class="stat-label">Study Hours</div><div id="stat-hours" class="stat-value">0h</div></div>
+          </div>
+        </div>
+        <div class="section-mb">
+          <div class="section-title">🏆 Achievements</div>
+          <div id="gamification-card" class="gamification-card">
+            <div class="gamification-header">
+              <div class="gamification-level">
+                <span class="gamification-level-num" id="gam-level">1</span>
+                <span class="gamification-level-label">Level</span>
+              </div>
+              <div class="gamification-xp-wrap">
+                <div class="gamification-xp-top">
+                  <span id="gam-xp">0 XP</span>
+                  <span id="gam-xp-next" class="gamification-xp-next">150 XP to Level 2</span>
+                </div>
+                <div class="progress-bar"><div id="gam-xp-bar" class="progress-fill" style="width:0%"></div></div>
+              </div>
+              <div class="gamification-badge-count"><span id="gam-badge-count">0</span> / <span id="gam-badge-total">0</span> badges</div>
+            </div>
+            <div id="gam-badge-grid" class="gam-badge-grid"></div>
           </div>
         </div>
       </div>
@@ -1210,6 +1247,7 @@ var charts = {};
 var gpaHistory = [];
 var studyActivity = {};
 var aiStudyMode = false;
+var gamification = { xp: 0, badges: [] };
 var countdownTimer = null;
 var editingSubjectId = null;
 var editingTTId = null;
@@ -2360,6 +2398,221 @@ function calcOverallGPA() {
 }
 
 // ============================================================
+// GAMIFICATION (Part 11)
+// ============================================================
+var XP_PER_LEVEL = 150;
+var GAMIFICATION_BADGES = [
+  { id: 'first_subject', icon: '🎓', name: 'First Steps', desc: 'Add your first subject', reward: 50 },
+  { id: 'perfect', icon: '🏆', name: 'Perfect Score', desc: 'Score 95%+ on any component', reward: 75 },
+  { id: 'on_fire', icon: '🔥', name: 'On Fire', desc: '80%+ on midterm, assignments & final', reward: 100 },
+  { id: 'on_track', icon: '🎯', name: 'On Track', desc: 'A subject meets your target GPA', reward: 60 },
+  { id: 'goal_crusher', icon: '⭐', name: 'Goal Crusher', desc: 'Reach your semester target GPA', reward: 150 },
+  { id: 'deans_list', icon: '🌟', name: "Dean's List", desc: 'Semester GPA of 3.5 or higher', reward: 120 },
+  { id: 'chapter_master', icon: '📚', name: 'Chapter Master', desc: 'Complete all chapters in a subject', reward: 90 },
+  { id: 'planner', icon: '🗓️', name: 'Master Planner', desc: 'Generate an AI study schedule', reward: 40 },
+  { id: 'study_streak', icon: '📅', name: 'Study Streak', desc: 'Stay active 3 days in a row', reward: 70 },
+  { id: 'comeback', icon: '💪', name: 'Comeback Kid', desc: 'Improve a subject GPA by 0.3+', reward: 80 }
+];
+
+function getGamificationKey() {
+  return currentUser ? 'ga_gamification_' + currentUser.email : null;
+}
+
+function loadGamification() {
+  if (!currentUser) {
+    gamification = { xp: 0, badges: [] };
+    return;
+  }
+  var raw = localStorage.getItem(getGamificationKey());
+  var data = raw ? parseJSON(raw, { xp: 0, badges: [] }) : { xp: 0, badges: [] };
+  if (!data || typeof data !== 'object') data = { xp: 0, badges: [] };
+  gamification = {
+    xp: safeFloat(data.xp, 0),
+    badges: Array.isArray(data.badges) ? data.badges.slice() : []
+  };
+}
+
+function saveGamification() {
+  if (!currentUser) return;
+  localStorage.setItem(getGamificationKey(), JSON.stringify(gamification));
+}
+
+function getBadgeDef(id) {
+  for (var i = 0; i < GAMIFICATION_BADGES.length; i++) {
+    if (GAMIFICATION_BADGES[i].id === id) return GAMIFICATION_BADGES[i];
+  }
+  return null;
+}
+
+function hasBadge(id) {
+  return gamification.badges && gamification.badges.indexOf(id) !== -1;
+}
+
+function calcLevelInfo(xp) {
+  var total = safeFloat(xp, 0);
+  var level = Math.floor(total / XP_PER_LEVEL) + 1;
+  var current = total % XP_PER_LEVEL;
+  return {
+    level: level,
+    current: current,
+    needed: XP_PER_LEVEL,
+    pct: Math.min(100, (current / XP_PER_LEVEL) * 100)
+  };
+}
+
+function subjectHasPerfectComponent(s) {
+  if (!s || !s.components) return false;
+  return ['midterm', 'assignment', 'quiz', 'project', 'final'].some(function(key) {
+    var pct = getComponentRawPct(s.components[key]);
+    return pct !== null && pct > 95;
+  });
+}
+
+function subjectOnFire(s) {
+  if (!s || !s.components) return false;
+  var mid = getComponentRawPct(s.components.midterm);
+  var ass = getComponentRawPct(s.components.assignment);
+  var fin = getComponentRawPct(s.components.final);
+  return mid !== null && mid > 80 && ass !== null && ass > 80 && fin !== null && fin > 80;
+}
+
+function subjectChaptersComplete(s) {
+  var ch = getChapterProgress(s.chapters);
+  return ch && ch.total > 0 && ch.done === ch.total;
+}
+
+function getStudyStreakDays() {
+  studyActivity = studyActivity || {};
+  var streak = 0;
+  var d = new Date();
+  for (var i = 0; i < 30; i++) {
+    var key = d.toISOString().slice(0, 10);
+    if ((studyActivity[key] || 0) > 0) streak++;
+    else break;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function awardDailyXP(silent) {
+  if (!currentUser) return;
+  var today = new Date().toISOString().slice(0, 10);
+  var key = 'ga_xp_daily_' + currentUser.email + '_' + today;
+  if (localStorage.getItem(key)) return;
+  localStorage.setItem(key, '1');
+  var oldLevel = calcLevelInfo(gamification.xp).level;
+  gamification.xp = safeFloat(gamification.xp, 0) + 10;
+  saveGamification();
+  if (!silent) {
+    showToast('+10 XP — Daily check-in', 'success');
+    if (calcLevelInfo(gamification.xp).level > oldLevel) {
+      setTimeout(function() {
+        showAchievementPopup('Level Up!', 'You reached Level ' + calcLevelInfo(gamification.xp).level + '!');
+      }, 350);
+    }
+  }
+}
+
+function unlockBadge(badgeId, silent) {
+  if (!currentUser || hasBadge(badgeId)) return false;
+  var def = getBadgeDef(badgeId);
+  if (!def) return false;
+  gamification.badges.push(badgeId);
+  var oldLevel = calcLevelInfo(gamification.xp).level;
+  gamification.xp = safeFloat(gamification.xp, 0) + def.reward;
+  saveGamification();
+  if (!silent) {
+    showToast(def.icon + ' Badge unlocked: ' + def.name + ' (+' + def.reward + ' XP)', 'success');
+    if (calcLevelInfo(gamification.xp).level > oldLevel) {
+      setTimeout(function() {
+        showAchievementPopup('Level Up!', 'You reached Level ' + calcLevelInfo(gamification.xp).level + '!');
+      }, 350);
+    }
+  }
+  return true;
+}
+
+function checkGamification(silent) {
+  if (!currentUser) return;
+  loadGamification();
+  if (!silent) awardDailyXP(false);
+
+  if ((subjects || []).length >= 1) unlockBadge('first_subject', silent);
+
+  (subjects || []).forEach(function(s) {
+    if (!s) return;
+    if (subjectHasPerfectComponent(s)) unlockBadge('perfect', silent);
+    if (subjectOnFire(s)) unlockBadge('on_fire', silent);
+    if (subjectChaptersComplete(s)) unlockBadge('chapter_master', silent);
+    if (targetGPA > 0) {
+      var sg = getSubjectGpa(s);
+      if (sg !== null && sg >= targetGPA) unlockBadge('on_track', silent);
+    }
+    var sk = getPrevSubGpaKey(s.id);
+    var sgNow = getSubjectGpa(s);
+    if (sk && sgNow !== null) {
+      var prevSub = safeFloat(localStorage.getItem(sk), sgNow);
+      if (sgNow - prevSub >= 0.3) unlockBadge('comeback', silent);
+    }
+  });
+
+  var gpa = calcOverallGPA();
+  if (targetGPA > 0 && gpa >= targetGPA) unlockBadge('goal_crusher', silent);
+  if (gpa >= 3.5) unlockBadge('deans_list', silent);
+
+  timetable = timetable || [];
+  if (timetable.some(function(t) { return t && t.aiGenerated; })) unlockBadge('planner', silent);
+  if (getStudyStreakDays() >= 3) unlockBadge('study_streak', silent);
+
+  renderGamification();
+}
+
+function renderGamification() {
+  var levelEl = document.getElementById('gam-level');
+  var xpEl = document.getElementById('gam-xp');
+  var nextEl = document.getElementById('gam-xp-next');
+  var barEl = document.getElementById('gam-xp-bar');
+  var countEl = document.getElementById('gam-badge-count');
+  var totalEl = document.getElementById('gam-badge-total');
+  var grid = document.getElementById('gam-badge-grid');
+  if (!levelEl || !grid) return;
+
+  if (!currentUser) {
+    levelEl.textContent = '1';
+    if (xpEl) xpEl.textContent = '0 XP';
+    if (nextEl) nextEl.textContent = 'Log in to earn XP';
+    if (barEl) barEl.style.width = '0%';
+    if (countEl) countEl.textContent = '0';
+    if (totalEl) totalEl.textContent = String(GAMIFICATION_BADGES.length);
+    grid.innerHTML = '<div class="predictor-empty">Log in and add subjects to start earning XP and badges.</div>';
+    return;
+  }
+
+  loadGamification();
+  var info = calcLevelInfo(gamification.xp);
+  levelEl.textContent = String(info.level);
+  if (xpEl) xpEl.textContent = Math.round(gamification.xp) + ' XP';
+  if (nextEl) nextEl.textContent = (info.needed - info.current) + ' XP to Level ' + (info.level + 1);
+  if (barEl) barEl.style.width = info.pct.toFixed(0) + '%';
+  if (countEl) countEl.textContent = String(gamification.badges.length);
+  if (totalEl) totalEl.textContent = String(GAMIFICATION_BADGES.length);
+
+  grid.innerHTML = GAMIFICATION_BADGES.map(function(b) {
+    var unlocked = hasBadge(b.id);
+    return '<div class="gam-badge-item ' + (unlocked ? 'unlocked' : 'locked') + '" title="' + escapeHtml(b.desc + ' (+' + b.reward + ' XP)') + '">' +
+      '<div class="gam-badge-icon">' + b.icon + '</div>' +
+      '<div class="gam-badge-name">' + escapeHtml(b.name) + '</div>' +
+      '<div class="gam-badge-reward">+' + b.reward + ' XP</div>' +
+    '</div>';
+  }).join('');
+
+  var ub = document.getElementById('user-badge');
+  if (ub && currentUser) {
+    ub.innerHTML = '👤 ' + escapeHtml(currentUser.username) + '<span class="user-level-tag">Lv.' + info.level + '</span>';
+  }
+}
+
+// ============================================================
 // LOCAL STORAGE
 // ============================================================
 function saveData() {
@@ -2371,6 +2624,7 @@ function saveData() {
     recordGpaSnapshot();
     recordStudyActivity();
     checkLowPerformanceAlert();
+    checkGamification(false);
     checkTargetAchievement();
   }
   if (document.getElementById('panel-analytics') && document.getElementById('panel-analytics').classList.contains('active')) {
@@ -2386,8 +2640,10 @@ function loadUserData() {
   gpaHistory = parseJSON(localStorage.getItem('ga_gpa_history_' + currentUser.email), []);
   studyActivity = parseJSON(localStorage.getItem('ga_study_activity_' + currentUser.email), {});
   aiStudyMode = localStorage.getItem('ga_ai_study_' + currentUser.email) === '1';
+  loadGamification();
   if (gpaHistory.length === 0 && calcOverallGPA() > 0) recordGpaSnapshot();
   initAchievementTracking();
+  try { checkGamification(true); } catch (e) { console.error('Gamification sync failed:', e); }
 }
 
 function recordGpaSnapshot() {
@@ -2482,6 +2738,7 @@ function renderOverview() {
     document.getElementById('stat-weakest').textContent = '—';
   }
   updateSubjectsSummary();
+  renderGamification();
 }
 
 // ============================================================
@@ -3530,11 +3787,17 @@ document.getElementById('login-btn').addEventListener('click', function() {
   if (!user) { showPopup('❌', 'Login Failed', 'Incorrect email or password. Please try again.'); return; }
   currentUser = user;
   localStorage.setItem('ga_current', JSON.stringify(user));
-  loadUserData();
-  document.getElementById('user-badge').textContent = '👤 ' + user.username;
-  showScreen('dashboard-screen');
-  renderAll();
-  showToast('Welcome back, ' + user.username + '! 👋', 'success');
+  try {
+    loadUserData();
+    showScreen('dashboard-screen');
+    renderAll();
+    showToast('Welcome back, ' + user.username + '! 👋', 'success');
+  } catch (e) {
+    console.error('Login failed:', e);
+    currentUser = null;
+    localStorage.removeItem('ga_current');
+    showPopup('❌', 'Login Error', 'Something went wrong loading your data. Please refresh and try again.');
+  }
 });
 
 document.getElementById('logout-btn').addEventListener('click', function() {
@@ -3543,6 +3806,7 @@ document.getElementById('logout-btn').addEventListener('click', function() {
     currentUser = null;
     localStorage.removeItem('ga_current');
     subjects = []; timetable = []; targetGPA = 0;
+    gamification = { xp: 0, badges: [] };
     if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     showScreen('login-screen');
     showToast('Logged out successfully.', 'info');
@@ -3863,10 +4127,16 @@ function initSubjectSetup() {
     var found = users.find(function(u) { return u && u.email === saved.email && u.password === saved.password; });
     if (found) {
       currentUser = found;
-      loadUserData();
-      document.getElementById('user-badge').textContent = '👤 ' + found.username;
-      showScreen('dashboard-screen');
-      renderAll();
+      try {
+        loadUserData();
+        showScreen('dashboard-screen');
+        renderAll();
+      } catch (e) {
+        console.error('Auto-login failed:', e);
+        currentUser = null;
+        localStorage.removeItem('ga_current');
+        showScreen('login-screen');
+      }
       initSubjectSetup();
       return;
     }
@@ -3902,8 +4172,7 @@ window.addEventListener('load', function(){
       var user = users.find(function(u){ return u && u.email===email && u.password===pass; });
       if(!user){ showPopup('❌','Login Failed','Incorrect email or password. Please try again.'); return; }
       currentUser = user; localStorage.setItem('ga_current', JSON.stringify(user));
-      try{ loadUserData(); }catch(e){ subjects = parseJSON(localStorage.getItem('ga_subjects_' + user.email), []); timetable = parseJSON(localStorage.getItem('ga_timetable_' + user.email), []); targetGPA = safeFloat(localStorage.getItem('ga_target_' + user.email), 0); gpaHistory = parseJSON(localStorage.getItem('ga_gpa_history_' + user.email), []); studyActivity = parseJSON(localStorage.getItem('ga_study_activity_' + user.email), {}); }
-      var ub = document.getElementById('user-badge'); if(ub) ub.textContent = '👤 ' + user.username;
+      try{ loadUserData(); }catch(e){ subjects = parseJSON(localStorage.getItem('ga_subjects_' + user.email), []); timetable = parseJSON(localStorage.getItem('ga_timetable_' + user.email), []); targetGPA = safeFloat(localStorage.getItem('ga_target_' + user.email), 0); gpaHistory = parseJSON(localStorage.getItem('ga_gpa_history_' + user.email), []); studyActivity = parseJSON(localStorage.getItem('ga_study_activity_' + user.email), {}); loadGamification(); checkGamification(true); }
       showScreen('dashboard-screen'); try{ renderAll(); }catch(e){}
       showToast('Welcome back, ' + user.username + '! 👋', 'success');
       var e1 = document.getElementById('login-email'); if(e1) e1.value=''; e1 = document.getElementById('login-password'); if(e1) e1.value='';
