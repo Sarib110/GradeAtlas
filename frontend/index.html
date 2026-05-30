@@ -218,6 +218,11 @@ select.input-field{cursor:pointer;}
 .popup-btn-ok:hover{background:var(--primary2);}
 .popup-btn-cancel{padding:11px 20px;border-radius:var(--radius-sm);font-weight:500;font-size:14px;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--bg3);color:var(--text2);border:1px solid var(--border);outline:none;}
 .popup-btn-cancel:hover{background:var(--bg2);}
+.popup-box.achievement{border-color:rgba(34,197,94,0.45);box-shadow:0 0 48px rgba(34,197,94,0.18),0 0 80px rgba(108,99,255,0.08);}
+.popup-box.achievement .popup-title{color:var(--green);}
+.popup-btn-ok.achievement-btn{background:linear-gradient(135deg,var(--green),#22c55e);}
+@keyframes achievementPop{0%{transform:scale(0.92);opacity:0;}60%{transform:scale(1.03);}100%{transform:scale(1);opacity:1;}}
+.popup-box.achievement{animation:achievementPop 0.45s ease;}
 /* TOAST */
 .toast-container{position:fixed;bottom:80px;right:16px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
 .toast{padding:12px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;max-width:280px;opacity:0;transform:translateX(20px);transition:all 0.3s ease;pointer-events:auto;}
@@ -1891,6 +1896,7 @@ function showPopup(icon, title, msg, onConfirm) {
 }
 
 function closePopup() {
+  clearAchievementPopupStyle();
   document.getElementById('popup-overlay').classList.remove('active');
 }
 
@@ -1911,6 +1917,117 @@ document.getElementById('popup-cancel').addEventListener('click', function() {
 document.getElementById('popup-overlay').addEventListener('click', function(e) {
   if (e.target === this) { _popupConfirmCb = null; closePopup(); }
 });
+
+// ============================================================
+// TARGET ACHIEVEMENT (Part 8)
+// ============================================================
+var _achievementSoundPlayed = false;
+
+function playAchievementSound() {
+  if (_achievementSoundPlayed) return;
+  _achievementSoundPlayed = true;
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    var ctx = new Ctx();
+    var notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach(function(freq, i) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      var t = ctx.currentTime + i * 0.13;
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.exponentialRampToValueAtTime(0.18, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+    });
+    setTimeout(function() { try { ctx.close(); } catch(e) {} }, 1200);
+  } catch (e) { /* audio blocked or unsupported */ }
+}
+
+function showAchievementPopup(title, msg) {
+  var box = document.querySelector('#popup-overlay .popup-box');
+  var okBtn = document.getElementById('popup-ok');
+  if (box) box.classList.add('achievement');
+  if (okBtn) okBtn.classList.add('achievement-btn');
+  playAchievementSound();
+  showPopup('🎉', title, msg);
+}
+
+function clearAchievementPopupStyle() {
+  var box = document.querySelector('#popup-overlay .popup-box');
+  var okBtn = document.getElementById('popup-ok');
+  if (box) box.classList.remove('achievement');
+  if (okBtn) okBtn.classList.remove('achievement-btn');
+}
+
+function getPrevGpaKey() {
+  return currentUser ? 'ga_prev_gpa_' + currentUser.email : null;
+}
+
+function getPrevSubGpaKey(subjectId) {
+  return currentUser ? 'ga_prev_subgpa_' + currentUser.email + '_' + subjectId : null;
+}
+
+function initAchievementTracking() {
+  if (!currentUser) return;
+  var gpa = calcOverallGPA();
+  var key = getPrevGpaKey();
+  if (key) localStorage.setItem(key, String(gpa));
+  (subjects || []).forEach(function(s) {
+    if (!s) return;
+    var sg = getSubjectGpa(s);
+    var sk = getPrevSubGpaKey(s.id);
+    if (sk && sg !== null) localStorage.setItem(sk, String(sg));
+  });
+}
+
+function checkTargetAchievement() {
+  if (!currentUser || targetGPA <= 0) return;
+  _achievementSoundPlayed = false;
+
+  var gpa = calcOverallGPA();
+  var prevKey = getPrevGpaKey();
+  var prevGpa = prevKey ? safeFloat(localStorage.getItem(prevKey), gpa) : gpa;
+
+  if (gpa > 0 && prevGpa < targetGPA && gpa >= targetGPA) {
+    showAchievementPopup(
+      'Target GPA Achieved!',
+      'Congratulations! Your semester GPA reached ' + gpa.toFixed(2) + ' — meeting your target of ' + targetGPA.toFixed(2) + '. Keep up the great work!'
+    );
+  }
+
+  if (prevKey) localStorage.setItem(prevKey, String(gpa));
+
+  var subjectHits = [];
+  (subjects || []).forEach(function(s) {
+    if (!s) return;
+    var sg = getSubjectGpa(s);
+    if (sg === null) return;
+    var sk = getPrevSubGpaKey(s.id);
+    var prevSub = sk ? safeFloat(localStorage.getItem(sk), sg) : sg;
+    if (prevSub < targetGPA && sg >= targetGPA) {
+      subjectHits.push(s.name);
+    }
+    if (sk) localStorage.setItem(sk, String(sg));
+  });
+
+  if (subjectHits.length) {
+    var label = subjectHits.slice(0, 3).join(', ') + (subjectHits.length > 3 ? ' +' + (subjectHits.length - 3) + ' more' : '');
+    if (gpa > 0 && prevGpa < targetGPA && gpa >= targetGPA) {
+      showToast('🎯 ' + label + ' also reached target GPA!', 'success');
+    } else if (gpa < targetGPA) {
+      showAchievementPopup(
+        'Subject Target Hit!',
+        label + ' reached your target GPA of ' + targetGPA.toFixed(2) + '! Keep pushing your semester GPA.'
+      );
+    }
+  }
+}
 
 // ============================================================
 // TOAST
@@ -2020,6 +2137,7 @@ function saveData() {
     localStorage.setItem('ga_target_' + currentUser.email, String(targetGPA));
     recordGpaSnapshot();
     recordStudyActivity();
+    checkTargetAchievement();
   }
   if (document.getElementById('panel-analytics') && document.getElementById('panel-analytics').classList.contains('active')) {
     renderCharts();
@@ -2035,6 +2153,7 @@ function loadUserData() {
   studyActivity = parseJSON(localStorage.getItem('ga_study_activity_' + currentUser.email), {});
   aiStudyMode = localStorage.getItem('ga_ai_study_' + currentUser.email) === '1';
   if (gpaHistory.length === 0 && calcOverallGPA() > 0) recordGpaSnapshot();
+  initAchievementTracking();
 }
 
 function recordGpaSnapshot() {
