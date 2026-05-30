@@ -989,30 +989,35 @@ select.input-field{cursor:pointer;}
               if (typeof loadFormChaptersFromSubject === 'function') loadFormChaptersFromSubject(s);
               setMode(s.mode === 'relative' ? 'relative' : 'absolute');
               if (s.stage) setStage(s.stage);
-              
+
               if (s.mode === 'relative') {
                 var slider = document.getElementById('rel-gpa-slider');
                 var number = document.getElementById('rel-gpa-number');
                 var gpaVal = s.gpa != null ? s.gpa : 3;
                 if (slider) slider.value = gpaVal;
                 if (number) number.value = gpaVal;
-                return;
               }
-              
+
               var comp = s.components || {};
               var mid = comp.midterm || {}, ass = comp.assignment || {}, quiz = comp.quiz || {}, proj = comp.project || {}, fin = comp.final || {};
-              
+
               if (wMid) wMid.value = safeNum(mid.weight, wMid.value);
               if (midObt) midObt.value = (mid.obtained != null && mid.obtained !== undefined) ? mid.obtained : '';
               if (midTot) midTot.value = safeNum(mid.total, 100);
-              
+
               if (wAss) wAss.value = safeNum(ass.weight, wAss.value);
               if (wQuiz) wQuiz.value = safeNum(quiz.weight, wQuiz.value);
               if (wProject) wProject.value = safeNum(proj.weight, wProject.value);
-              
+
               if (wFin) wFin.value = safeNum(fin.weight, wFin.value);
               if (finObt) finObt.value = (fin.obtained != null && fin.obtained !== undefined) ? fin.obtained : '';
               if (finTot) finTot.value = safeNum(fin.total, 100);
+
+              if (midClassAvgEl) midClassAvgEl.value = (mid.classAvg != null && mid.classAvg !== undefined) ? mid.classAvg : '';
+              if (assClassAvgEl) assClassAvgEl.value = (ass.classAvg != null && ass.classAvg !== undefined) ? ass.classAvg : '';
+              if (quizClassAvgEl) quizClassAvgEl.value = (quiz.classAvg != null && quiz.classAvg !== undefined) ? quiz.classAvg : '';
+              if (projClassAvgEl) projClassAvgEl.value = (proj.classAvg != null && proj.classAvg !== undefined) ? proj.classAvg : '';
+              if (finClassAvgEl) finClassAvgEl.value = (fin.classAvg != null && fin.classAvg !== undefined) ? fin.classAvg : '';
               
               function fillDynRows(items, countEl, buildFn, listEl, obtClass, totClass, nameClass) {
                 var itemsToUse = items && items.length ? items : [];
