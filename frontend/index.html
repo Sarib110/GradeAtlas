@@ -575,11 +575,11 @@ select.input-field{cursor:pointer;}
                 </div>
                 <div style="display:flex;gap:12px;align-items:flex-end;margin-top:8px;">
                   <div style="flex:1;">
-                    <label class="form-label">GPA</label>
-                    <input type="range" id="abs-target-slider" min="0" max="4" step="0.1" value="3">
+                    <label class="form-label">Current GPA</label>
+                    <input type="range" id="abs-current-gpa-slider" min="0" max="4" step="0.01" value="0" disabled>
                   </div>
                   <div style="width:100px;">
-                    <label class="form-label">Selected GPA</label>
+                    <label class="form-label">Target GPA</label>
                     <input type="number" id="abs-target-gpa" class="input-field abs-target-input" min="0" max="4" step="0.1" value="3.0">
                   </div>
                 </div>
@@ -593,12 +593,12 @@ select.input-field{cursor:pointer;}
           <div id="relative-panel" style="margin-top:12px;display:none;">
             <div style="display:flex;gap:12px;align-items:center;">
               <div style="flex:1;">
-                <label class="form-label">GPA</label>
-                <input type="range" id="rel-gpa-slider" min="0" max="4" step="0.1" value="3">
+                <label class="form-label">Required Final Exam Score</label>
+                <input type="range" id="rel-gpa-slider" min="0" max="100" step="1" value="0" disabled>
               </div>
               <div style="width:80px;">
-                <label class="form-label">Value</label>
-                <input type="number" id="rel-gpa-number" class="input-field" min="0" max="4" step="0.1" value="3.0">
+                <label class="form-label">Required</label>
+                <input type="text" id="rel-gpa-number" class="input-field" readonly value="—">
               </div>
             </div>
           </div>
@@ -671,9 +671,11 @@ select.input-field{cursor:pointer;}
           .abs-target-input.abs-gpa-low{border-color:var(--red);}
           .abs-target-input.abs-gpa-mid{border-color:var(--amber);}
           .abs-target-input.abs-gpa-high{border-color:#38bdf8;}
-          #abs-target-slider.abs-gpa-low{accent-color:var(--red);}
-          #abs-target-slider.abs-gpa-mid{accent-color:var(--amber);}
-          #abs-target-slider.abs-gpa-high{accent-color:#38bdf8;}
+          #abs-current-gpa-slider.abs-gpa-low{accent-color:var(--red);}
+          #abs-current-gpa-slider.abs-gpa-mid{accent-color:var(--amber);}
+          #abs-current-gpa-slider.abs-gpa-high{accent-color:#38bdf8;}
+          #abs-current-gpa-slider:disabled,#rel-gpa-slider:disabled{opacity:0.85;cursor:default;}
+          #rel-gpa-number{text-align:center;font-weight:600;}
           /* Stage pills */
           .stage-pill{background:transparent;color:var(--text2);transition:all 0.18s;border-radius:999px;padding:8px 12px;}
           .stage-pill.selected{background:linear-gradient(90deg,var(--primary),var(--primary2));color:#fff;border-color:transparent;transform:translateY(-3px)}
@@ -712,7 +714,7 @@ select.input-field{cursor:pointer;}
             var stageMsg = document.getElementById('stage-msg');
             var absModeHelper = document.getElementById('abs-mode-helper');
             var relModeHelper = document.getElementById('rel-mode-helper');
-            var absTargetSlider = document.getElementById('abs-target-slider');
+            var absCurrentGpaSlider = document.getElementById('abs-current-gpa-slider');
             var absTargetGpaInput = document.getElementById('abs-target-gpa');
             var absGpaHint = document.getElementById('abs-gpa-hint');
             var absTargetGpa = 3.0;
@@ -733,10 +735,8 @@ select.input-field{cursor:pointer;}
               var gpa = safeNum(absTargetGpaInput ? absTargetGpaInput.value : absTargetGpa, absTargetGpa);
               gpa = Math.max(0, Math.min(4, gpa));
               absTargetGpa = gpa;
-              if (absTargetSlider) absTargetSlider.value = gpa;
               if (absTargetGpaInput) absTargetGpaInput.value = gpa.toFixed(1);
               applyGpaTone(absTargetGpaInput, gpaTone(gpa));
-              applyGpaTone(absTargetSlider, gpaTone(gpa));
               calcPreview();
             }
 
@@ -789,23 +789,31 @@ select.input-field{cursor:pointer;}
             }
             absBtn.addEventListener('click', function(){ setMode('absolute'); }); relBtn.addEventListener('click', function(){ setMode('relative'); }); var saved = localStorage.getItem(MODE_KEY) || 'absolute'; setMode(saved);
 
-            if (absTargetSlider) absTargetSlider.addEventListener('input', function(){ if(absTargetGpaInput) absTargetGpaInput.value = absTargetSlider.value; updateAbsTargetUi(); });
-            if (absTargetGpaInput) absTargetGpaInput.addEventListener('input', function(){ if(absTargetSlider) absTargetSlider.value = absTargetGpaInput.value; updateAbsTargetUi(); });
+            if (absTargetGpaInput) absTargetGpaInput.addEventListener('input', updateAbsTargetUi);
             document.querySelectorAll('.abs-preset').forEach(function(btn){
               btn.addEventListener('click', function(){
                 var v = safeNum(btn.getAttribute('data-gpa'), 3);
-                if(absTargetSlider) absTargetSlider.value = v;
                 if(absTargetGpaInput) absTargetGpaInput.value = v.toFixed(1);
                 updateAbsTargetUi();
               });
             });
 
-            function setStage(s){ localStorage.setItem(STAGE_KEY, s); [stageMid,stagePost,stageComplete].forEach(function(el){ if(!el) return; el.classList.remove('selected'); }); if(s==='mid-semester'){ stageMid.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='0'; if(stageMsg) stageMsg.textContent = "Final exam not yet — we'll predict your target!"; } else if(s==='post-midterm'){ stagePost.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='1'; if(stageMsg) stageMsg.textContent = "Finals approaching — final marks optional (leave blank to predict)."; } else { stageComplete.classList.add('selected'); if(finalBlock) finalBlock.style.opacity='1'; if(stageMsg) stageMsg.textContent = "Semester complete — enter all marks to compute final GPA."; } }
+            function setStage(s){
+              localStorage.setItem(STAGE_KEY, s);
+              [stageMid,stagePost,stageComplete].forEach(function(el){ if(!el) return; el.classList.remove('selected'); });
+              if(s==='mid-semester'){
+                stageMid.classList.add('selected');
+                if(finalBlock) finalBlock.style.opacity='0';
+              } else if(s==='post-midterm'){
+                stagePost.classList.add('selected');
+                if(finalBlock) finalBlock.style.opacity='1';
+              } else {
+                stageComplete.classList.add('selected');
+                if(finalBlock) finalBlock.style.opacity='1';
+              }
+              calcPreview();
+            }
             stageMid.addEventListener('click', function(){ setStage('mid-semester'); }); stagePost.addEventListener('click', function(){ setStage('post-midterm'); }); stageComplete.addEventListener('click', function(){ setStage('complete'); });
-            var savedStage = localStorage.getItem(STAGE_KEY) || 'mid-semester'; setStage(savedStage);
-
-            // slider sync
-            var slider = document.getElementById('rel-gpa-slider'); var number = document.getElementById('rel-gpa-number'); if(slider && number){ slider.addEventListener('input', function(){ number.value = slider.value; }); number.addEventListener('input', function(){ slider.value = number.value; }); }
 
             // weight preview and stage-aware messages
             var wMid = document.getElementById('comp-mid-weight');
@@ -869,7 +877,7 @@ select.input-field{cursor:pointer;}
 
             function targetPercentFromGPA(gpa){ if(gpa >= 4.0) return 85; if(gpa >= 3.7) return 80; if(gpa >= 3.3) return 75; if(gpa >= 3.0) return 71; if(gpa >= 2.7) return 68; if(gpa >= 2.3) return 64; if(gpa >= 2.0) return 61; if(gpa >= 1.7) return 58; if(gpa >= 1.3) return 54; if(gpa >= 1.0) return 50; return null; }
 
-            function resetAbsoluteDefaults(){ if(wMid) wMid.value='30'; if(midObt) midObt.value=''; if(midTot) midTot.value='50'; if(wAss) wAss.value='20'; if(assCount) assCount.value='1'; if(wQuiz) wQuiz.value='10'; if(quizCount) quizCount.value='1'; if(wProject) wProject.value='0'; if(projectCount) projectCount.value='1'; if(projectPanel) projectPanel.style.display='none'; if(wFin) wFin.value='40'; if(finObt) finObt.value=''; if(finTot) finTot.value='100'; if(assignmentsList) buildAssignmentRows(1); if(quizzesList) buildQuizRows(1); if(projectsList) projectsList.innerHTML=''; if(absPreviewPct) absPreviewPct.textContent='—'; if(absPreviewGpa) absPreviewGpa.textContent='—'; updateAbsPreviewUi(null, 0); absTargetGpa = 3; if(absTargetSlider) absTargetSlider.value = 3; if(absTargetGpaInput) absTargetGpaInput.value = '3.0'; applyGpaTone(absTargetGpaInput, 'mid'); applyGpaTone(absTargetSlider, 'mid'); if(absWarning){ absWarning.textContent=''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; } if(weightsStatus){ weightsStatus.textContent='✅ Weights OK'; weightsStatus.style.color='var(--green)'; } }
+            function resetAbsoluteDefaults(){ if(wMid) wMid.value='30'; if(midObt) midObt.value=''; if(midTot) midTot.value='50'; if(wAss) wAss.value='20'; if(assCount) assCount.value='1'; if(wQuiz) wQuiz.value='10'; if(quizCount) quizCount.value='1'; if(wProject) wProject.value='0'; if(projectCount) projectCount.value='1'; if(projectPanel) projectPanel.style.display='none'; if(wFin) wFin.value='40'; if(finObt) finObt.value=''; if(finTot) finTot.value='100'; if(assignmentsList) buildAssignmentRows(1); if(quizzesList) buildQuizRows(1); if(projectsList) projectsList.innerHTML=''; if(absPreviewPct) absPreviewPct.textContent='—'; if(absPreviewGpa) absPreviewGpa.textContent='—'; updateAbsPreviewUi(null, 0); absTargetGpa = 3; if(absCurrentGpaSlider) absCurrentGpaSlider.value = 0; if(absTargetGpaInput) absTargetGpaInput.value = '3.0'; applyGpaTone(absTargetGpaInput, 'mid'); applyGpaTone(absCurrentGpaSlider, 'mid'); if(absWarning){ absWarning.textContent=''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; } var ws = document.getElementById('weights-status'); if(ws){ ws.textContent='✅ Weights OK'; ws.style.color='var(--green)'; } }
 
             function clampCount(input, min, max){ if(!input) return; var v = parseInt(input.value, 10); if(isNaN(v)) v = min; v = Math.max(min, Math.min(max, v)); if(input.value != v) input.value = v; return v; }
 
@@ -914,47 +922,86 @@ select.input-field{cursor:pointer;}
               if(finPct !== null) weighted += finPct * (e / 100);
 
               var overall = totalWeight ? weighted : 0;
-              absPreviewPct.textContent = totalWeight ? overall.toFixed(1) + '%' : '—';
+              if (absPreviewPct) absPreviewPct.textContent = totalWeight ? overall.toFixed(1) + '%' : '—';
               var g = null;
               try { g = pctToGPA(overall, document.getElementById('subject-system').value); updateAbsPreviewUi(isFinite(g) ? g : null, overall); } catch(e){ if(absPreviewGpa) absPreviewGpa.textContent = '—'; updateAbsPreviewUi(null, overall); }
 
               var stage = localStorage.getItem(STAGE_KEY) || 'mid-semester';
               if(stage === 'mid-semester'){
                 if(finalBlock) finalBlock.style.display='none';
-                if(absWarning){ absWarning.textContent = ''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; }
               } else if(stage === 'post-midterm'){
                 if(finalBlock) finalBlock.style.display='block';
-                if(finObt && String(finObt.value).trim() === ''){
-                  if(absWarning){ absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; }
-                  var targetPct = targetPercentFromGPA(absTargetGpa);
-                  if(targetPct !== null && e > 0){
-                    var currentScore = 0;
-                    if(midPct !== null) currentScore += midPct * (a / 100);
-                    if(assSummary.avg !== null) currentScore += assSummary.avg * (b / 100);
-                    if(quizSummary.avg !== null) currentScore += quizSummary.avg * (c / 100);
-                    if(projectSummary.avg !== null) currentScore += projectSummary.avg * (d / 100);
-                    var neededFinal = ((targetPct - currentScore) / (e / 100));
-                    
-                    // For relative mode, show what you need to score (accounting for class average)
-                    var displayText = '';
-                    if(currentMode === 'relative'){
-                      var finClassAvg = safeNum(document.getElementById('comp-final-classavg').value, null);
-                      if(finClassAvg > 0){
-                        var rawNeeded = (neededFinal * finClassAvg) / 100; // Convert back to raw score
-                        displayText = ' (raw: '+rawNeeded.toFixed(0)+'% if class avg is '+finClassAvg+'%)';
-                      }
-                    }
-                    
-                    if(neededFinal <= 0){ absWarning.textContent = '🎉 Target GPA already secured! Final is bonus!'; absWarning.style.color='var(--green)'; }
-                    else if(neededFinal <= 50){ absWarning.textContent = '✅ Easy! Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final'; absWarning.style.color='var(--green)'; }
-                    else if(neededFinal <= 75){ absWarning.textContent = '📈 Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final — achievable!'; absWarning.style.color='var(--amber)'; }
-                    else if(neededFinal <= 100){ absWarning.textContent = '⚠️ Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final — study hard!'; absWarning.style.color='orange'; }
-                    else { absWarning.textContent = '🚨 Target impossible even with 100% in Final!'; absWarning.style.color='red'; absWarning.classList.add('pulse-warning'); absWarning.style.animation='pulse 1.2s ease-in-out infinite'; }
-                  } else { if(absWarning) absWarning.textContent = ''; }
-                } else { if(absWarning) absWarning.textContent = ''; }
               } else {
                 if(finalBlock) finalBlock.style.display='block';
-                if(absWarning) absWarning.textContent = '';
+              }
+
+              var finalBlank = !finObt || String(finObt.value).trim() === '';
+              var shouldPredict = (stage === 'mid-semester' || (stage === 'post-midterm' && finalBlank));
+              var neededFinal = null;
+              if (shouldPredict && e > 0) {
+                var targetPct = targetPercentFromGPA(absTargetGpa);
+                if (targetPct !== null) {
+                  var currentScore = 0;
+                  if(midPct !== null) currentScore += midPct * (a / 100);
+                  if(assSummary.avg !== null) currentScore += assSummary.avg * (b / 100);
+                  if(quizSummary.avg !== null) currentScore += quizSummary.avg * (c / 100);
+                  if(projectSummary.avg !== null) currentScore += projectSummary.avg * (d / 100);
+                  neededFinal = ((targetPct - currentScore) / (e / 100));
+                }
+              }
+
+              if (absCurrentGpaSlider) {
+                var currentGpaVal = isFinite(g) ? Math.max(0, Math.min(4, g)) : 0;
+                absCurrentGpaSlider.value = currentGpaVal;
+                applyGpaTone(absCurrentGpaSlider, gpaTone(isFinite(g) ? g : 0));
+              }
+
+              var relSlider = document.getElementById('rel-gpa-slider');
+              var relNumber = document.getElementById('rel-gpa-number');
+              if (currentMode === 'relative' && relSlider && relNumber) {
+                if (neededFinal !== null) {
+                  var reqPct = Math.max(0, Math.min(100, neededFinal));
+                  relSlider.value = reqPct;
+                  relNumber.value = reqPct.toFixed(0) + '%';
+                } else {
+                  relSlider.value = 0;
+                  relNumber.value = '—';
+                }
+              }
+
+              if (stageMsg) {
+                if (shouldPredict && neededFinal !== null && e > 0) {
+                  if (neededFinal <= 0) stageMsg.textContent = 'Target GPA ' + absTargetGpa.toFixed(1) + ' already secured with current marks!';
+                  else if (neededFinal > 100) stageMsg.textContent = 'Target GPA ' + absTargetGpa.toFixed(1) + ' is unreachable even with 100% in finals.';
+                  else stageMsg.textContent = 'You need ' + neededFinal.toFixed(0) + '% in finals to achieve ' + absTargetGpa.toFixed(1) + ' GPA';
+                } else if (stage === 'complete') {
+                  stageMsg.textContent = 'Semester complete — enter all marks to compute final GPA.';
+                } else if (stage === 'post-midterm' && finalBlank) {
+                  stageMsg.textContent = 'Finals approaching — leave final blank to predict required score.';
+                } else {
+                  stageMsg.textContent = '';
+                }
+              }
+
+              if(stage === 'post-midterm' && finalBlank && neededFinal !== null){
+                if(absWarning){ absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; }
+                var displayText = '';
+                if(currentMode === 'relative'){
+                  var finClassAvg = safeNum(document.getElementById('comp-final-classavg').value, null);
+                  if(finClassAvg > 0){
+                    var rawNeeded = (neededFinal * finClassAvg) / 100;
+                    displayText = ' (raw: '+rawNeeded.toFixed(0)+'% if class avg is '+finClassAvg+'%)';
+                  }
+                }
+                if(absWarning){
+                  if(neededFinal <= 0){ absWarning.textContent = '🎉 Target GPA already secured! Final is bonus!'; absWarning.style.color='var(--green)'; }
+                  else if(neededFinal <= 50){ absWarning.textContent = '✅ Easy! Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final'; absWarning.style.color='var(--green)'; }
+                  else if(neededFinal <= 75){ absWarning.textContent = '📈 Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final — achievable!'; absWarning.style.color='var(--amber)'; }
+                  else if(neededFinal <= 100){ absWarning.textContent = '⚠️ Need '+neededFinal.toFixed(0)+'%' + displayText + ' in Final — study hard!'; absWarning.style.color='orange'; }
+                  else { absWarning.textContent = '🚨 Target impossible even with 100% in Final!'; absWarning.style.color='red'; absWarning.classList.add('pulse-warning'); absWarning.style.animation='pulse 1.2s ease-in-out infinite'; }
+                }
+              } else {
+                if(absWarning){ absWarning.textContent = ''; absWarning.style.color=''; absWarning.classList.remove('pulse-warning'); absWarning.style.animation=''; }
               }
             }
 
@@ -989,14 +1036,6 @@ select.input-field{cursor:pointer;}
               if (typeof loadFormChaptersFromSubject === 'function') loadFormChaptersFromSubject(s);
               setMode(s.mode === 'relative' ? 'relative' : 'absolute');
               if (s.stage) setStage(s.stage);
-
-              if (s.mode === 'relative') {
-                var slider = document.getElementById('rel-gpa-slider');
-                var number = document.getElementById('rel-gpa-number');
-                var gpaVal = s.gpa != null ? s.gpa : 3;
-                if (slider) slider.value = gpaVal;
-                if (number) number.value = gpaVal;
-              }
 
               var comp = s.components || {};
               var mid = comp.midterm || {}, ass = comp.assignment || {}, quiz = comp.quiz || {}, proj = comp.project || {}, fin = comp.final || {};
@@ -1057,7 +1096,10 @@ select.input-field{cursor:pointer;}
             };
 
             resetAbsoluteDefaults();
-            setTimeout(calcPreview, 0);
+            setTimeout(function() {
+              var savedStage = localStorage.getItem(STAGE_KEY) || 'mid-semester';
+              setStage(savedStage);
+            }, 0);
 
             // Rich subject card renderer with stage badges and border colors
             function renderSubjectsPanel(){ var container=document.getElementById('subjects-list'); if(!container) return; container.innerHTML=''; var arr = subjects || []; if(!arr.length){ container.innerHTML = '<div class="empty-state"><div>🎓</div><p>Your academic journey starts here!</p><button id="empty-add" class="btn btn-primary" style="margin-top:12px;">+ Add Subject</button></div>'; var ea = document.getElementById('empty-add'); if(ea) ea.addEventListener('click', function(){ document.getElementById('subject-name').focus(); }); return; }
@@ -3360,8 +3402,7 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
       total = 100;
       gpa = pctToGPA(weightedRelative, system);
     } else {
-      // Fallback to manual slider if no components
-      gpa = safeFloat((document.getElementById('rel-gpa-number') || { value: '' }).value, null);
+      gpa = null;
     }
   }
 
@@ -3394,7 +3435,7 @@ document.getElementById('add-subject-btn').addEventListener('click', function() 
     // clear component fields
     var compIds = ['comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total'];
     compIds.forEach(function(id){ var el = document.getElementById(id); if(el) { if(id.indexOf('weight')!==-1) { /* keep defaults */ } else if(id.indexOf('total')!==-1) { el.value = '100'; } else el.value = ''; } });
-    if (document.getElementById('rel-gpa-slider')) document.getElementById('rel-gpa-slider').value = 3; if (document.getElementById('rel-gpa-number')) document.getElementById('rel-gpa-number').value = 3.0;
+    if (document.getElementById('rel-gpa-slider')) document.getElementById('rel-gpa-slider').value = 0; if (document.getElementById('rel-gpa-number')) document.getElementById('rel-gpa-number').value = '—';
     resetFormChapters();
   }
 });
@@ -3406,7 +3447,7 @@ var importBtn = document.getElementById('import-subjects-btn'); if(importBtn){
   importInput.addEventListener('change', function(e){ var f = e.target.files && e.target.files[0]; if(!f) return; var reader = new FileReader(); reader.onload = function(ev){ try{ var data = JSON.parse(ev.target.result); if(Array.isArray(data)){ var added=0; data.forEach(function(it){ try{ if(!it || !it.name) return; var obj = { id: it.id||generateId(), name: it.name, marks: (it.marks===undefined?null:it.marks), total: safeFloat(it.total,100), credits: safeFloat(it.credits,3), system: it.system||'pakistan', mode: it.mode||localStorage.getItem('subject_mode')||'absolute', components: it.components||{}, stage: it.stage||localStorage.getItem('subject_stage')||'mid-semester', gpa: it.gpa, chapters: Array.isArray(it.chapters) ? it.chapters : [] }; subjects.push(obj); added++; }catch(e){} }); if(added>0){ if(typeof saveUserData === 'function') saveUserData(); else saveData(); renderSubjects(); renderOverview(); showToast('Imported!','success'); } else { showToast('No valid subjects in file','warning'); } } else { showPopup('❌','Invalid File','JSON must be an array of subjects.'); } }catch(err){ showPopup('❌','Import Failed','Could not parse JSON file.'); } finally{ importInput.value=''; } }; reader.readAsText(f); }); }
 
 // CLEAR PANEL button: confirm then clear form inputs only
-var clearBtn = document.getElementById('clear-panel-btn'); if(clearBtn){ clearBtn.addEventListener('click', function(){ showPopup('⚠️','Clear Form','Clear all form fields in the Subjects panel?', function(){ var ids = ['subject-name','subject-marks','subject-total','subject-credits','subject-system','comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total','rel-gpa-slider','rel-gpa-number']; ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; if(el.type==='range') el.value = 3; else if(el.type==='number' && id.indexOf('total')!==-1) el.value = '100'; else if(id==='subject-credits') el.value='3'; else if(id==='subject-system') el.value='pakistan'; else el.value=''; }); if(document.getElementById('weights-status')) document.getElementById('weights-status').textContent=''; if(document.getElementById('abs-preview-pct')) document.getElementById('abs-preview-pct').textContent='—'; if(document.getElementById('abs-preview-gpa')) document.getElementById('abs-preview-gpa').textContent='—'; resetFormChapters(); showToast('Form cleared!','info'); }); }); }
+var clearBtn = document.getElementById('clear-panel-btn'); if(clearBtn){ clearBtn.addEventListener('click', function(){ showPopup('⚠️','Clear Form','Clear all form fields in the Subjects panel?', function(){ var ids = ['subject-name','subject-marks','subject-total','subject-credits','subject-system','comp-mid-weight','comp-mid-obt','comp-mid-total','comp-assn-weight','comp-assn-obt','comp-assn-total','comp-final-weight','comp-final-obt','comp-final-total','rel-gpa-slider','rel-gpa-number']; ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; if(id==='rel-gpa-slider') el.value = 0; else if(id==='rel-gpa-number') el.value = '—'; else if(el.type==='range') el.value = 0; else if(el.type==='number' && id.indexOf('total')!==-1) el.value = '100'; else if(id==='subject-credits') el.value='3'; else if(id==='subject-system') el.value='pakistan'; else el.value=''; }); if(document.getElementById('abs-current-gpa-slider')) document.getElementById('abs-current-gpa-slider').value = 0; if(document.getElementById('weights-status')) document.getElementById('weights-status').textContent=''; if(document.getElementById('abs-preview-pct')) document.getElementById('abs-preview-pct').textContent='—'; if(document.getElementById('abs-preview-gpa')) document.getElementById('abs-preview-gpa').textContent='—'; resetFormChapters(); showToast('Form cleared!','info'); }); }); }
 
 // ============================================================
 // RENDER TIMETABLE
