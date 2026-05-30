@@ -104,6 +104,13 @@ select.input-field{cursor:pointer;}
 .chart-card.full-width{grid-column:1/-1;}
 .chart-card h3{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.8px;}
 .chart-card canvas{max-height:220px;}
+.journey-legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin:-6px 0 12px;font-size:11px;color:var(--text2);}
+.journey-legend span{display:inline-flex;align-items:center;gap:6px;}
+.journey-legend .leg-line{width:22px;height:0;border-top:2px solid;}
+.journey-legend .leg-line.dotted{border-top-style:dashed;}
+.journey-legend .leg-swatch{width:12px;height:12px;border-radius:3px;}
+.journey-legend .leg-swatch.above{background:rgba(34,197,94,0.45);}
+.journey-legend .leg-swatch.below{background:rgba(239,68,68,0.45);}
 .chart-legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;font-size:12px;color:var(--text2);}
 .chart-legend .leg-low{color:#ef4444;}
 .chart-legend .leg-mid{color:#f59e0b;}
@@ -1227,7 +1234,15 @@ select.input-field{cursor:pointer;}
           <span class="leg-high">● Good (≥70%)</span>
         </div>
         <div class="chart-grid">
-          <div class="chart-card"><h3>GPA Trend</h3><canvas id="trend-chart"></canvas></div>
+          <div class="chart-card"><h3>GPA Journey Map</h3>
+            <div class="journey-legend">
+              <span><i class="leg-line" style="border-color:#6c63ff;"></i> Actual GPA</span>
+              <span><i class="leg-line dotted" style="border-color:#38bdf8;"></i> Predicted (course finals)</span>
+              <span><i class="leg-line dotted" style="border-color:#fbbf24;"></i> Target GPA</span>
+              <span><i class="leg-swatch above"></i> Above target</span>
+              <span><i class="leg-swatch below"></i> Below target</span>
+            </div>
+            <canvas id="trend-chart"></canvas></div>
           <div class="chart-card"><h3>Subject Comparison</h3><canvas id="radar-chart"></canvas></div>
           <div class="chart-card"><h3>Subject Scores (%)</h3><canvas id="bar-chart"></canvas></div>
           <div class="chart-card"><h3>Score Distribution</h3><canvas id="pie-chart"></canvas></div>
@@ -1614,6 +1629,101 @@ function calcProjectedGPA(targetGpaVal) {
     }
   });
   return totalCr ? totalPts / totalCr : 0;
+}
+
+function isSubjectMarksComplete(s) {
+  if (!s) return false;
+  if (s.stage === 'complete') return true;
+  var comp = s.components || {};
+  var fin = comp.final;
+  if (fin && safeFloat(fin.weight, 0) > 0) {
+    return fin.obtained !== null && fin.obtained !== undefined && fin.obtained !== '';
+  }
+  var keys = ['midterm', 'assignment', 'quiz', 'project'];
+  var any = false;
+  for (var i = 0; i < keys.length; i++) {
+    var c = comp[keys[i]];
+    if (!c || safeFloat(c.weight, 0) <= 0) continue;
+    any = true;
+    if (c.obtained === null || c.obtained === undefined || c.obtained === '') return false;
+  }
+  return any;
+}
+
+function calcPeerGpaFromCompleteSubjects() {
+  subjects = subjects || [];
+  var totalPts = 0, totalCr = 0;
+  subjects.forEach(function(s) {
+    if (!s || !isSubjectMarksComplete(s)) return;
+    var gpa = getSubjectGpa(s);
+    var cr = safeFloat(s.credits, 3);
+    if (gpa !== null) {
+      totalPts += gpa * cr;
+      totalCr += cr;
+    }
+  });
+  return totalCr ? totalPts / totalCr : 0;
+}
+
+function subjectNeedsFinalPrediction(s) {
+  if (!s || isSubjectMarksComplete(s)) return false;
+  var fin = (s.components || {}).final;
+  if (!fin || safeFloat(fin.weight, 0) <= 0) return false;
+  return fin.obtained === null || fin.obtained === undefined || fin.obtained === '';
+}
+
+function predictSubjectEndPct(s, peerGpa) {
+  if (isSubjectMarksComplete(s)) return getSubjectPct(s);
+  var comp = s.components || {};
+  var fin = comp.final;
+  var finalWeight = fin ? safeFloat(fin.weight, 0) : 0;
+  if (finalWeight <= 0) return getSubjectPct(s);
+
+  var currentScore = getSubjectCurrentScoreExcludingFinal(s);
+  if (currentScore <= 0 && getSubjectPct(s) === null) {
+    var peerPct = targetPercentFromGPA(peerGpa);
+    return peerPct !== null ? peerPct : null;
+  }
+
+  var targetPct = targetPercentFromGPA(peerGpa);
+  if (targetPct === null) return getSubjectPct(s);
+  var neededFinal = (targetPct - currentScore) / (finalWeight / 100);
+  if (neededFinal <= 0) return Math.max(currentScore, targetPct);
+  if (neededFinal > 100) return calcSubjectPctWithFinal(s, 100);
+  return calcSubjectPctWithFinal(s, neededFinal);
+}
+
+function calcSemesterEndPredictedGPA() {
+  subjects = subjects || [];
+  if (!subjects.length) return calcOverallGPA();
+
+  var needsPrediction = subjects.some(function(s) { return subjectNeedsFinalPrediction(s); });
+  if (!needsPrediction) return calcOverallGPA();
+
+  var peerGpa = calcPeerGpaFromCompleteSubjects();
+  if (peerGpa <= 0) peerGpa = calcOverallGPA();
+  if (peerGpa <= 0) peerGpa = targetGPA > 0 ? targetGPA : 3.0;
+
+  var totalPts = 0, totalCr = 0;
+  subjects.forEach(function(s) {
+    if (!s) return;
+    var cr = safeFloat(s.credits, 3);
+    var pct = predictSubjectEndPct(s, peerGpa);
+    if (pct !== null) {
+      totalPts += pctToGPA(pct, s.system || 'pakistan') * cr;
+      totalCr += cr;
+    } else {
+      var gpa = getSubjectGpa(s);
+      if (gpa !== null) {
+        totalPts += gpa * cr;
+        totalCr += cr;
+      } else if (subjectNeedsFinalPrediction(s) || !isSubjectMarksComplete(s)) {
+        totalPts += peerGpa * cr;
+        totalCr += cr;
+      }
+    }
+  });
+  return totalCr ? totalPts / totalCr : calcOverallGPA();
 }
 
 function renderPredictor() {
@@ -3664,6 +3774,126 @@ function destroyChart(key) {
 
 function chartTextColor() { return '#9090aa'; }
 
+var gpaJourneyFillPluginRegistered = false;
+var gpaJourneyFillPlugin = {
+  id: 'gpaJourneyFill',
+  beforeDatasetsDraw: function(chart) {
+    var opts = chart.options.plugins && chart.options.plugins.gpaJourneyFill;
+    if (!opts || !opts.targetGpa || opts.targetGpa <= 0) return;
+    var actualIdx = typeof opts.actualDatasetIndex === 'number' ? opts.actualDatasetIndex : 1;
+    var meta = chart.getDatasetMeta(actualIdx);
+    if (!meta || !meta.data.length) return;
+    var yTarget = chart.scales.y.getPixelForValue(opts.targetGpa);
+    var pts = [];
+    meta.data.forEach(function(pt, i) {
+      var val = chart.data.datasets[actualIdx].data[i];
+      if (val !== null && val !== undefined && !isNaN(val)) {
+        pts.push({ x: pt.x, y: pt.y, gpa: val });
+      }
+    });
+    if (!pts.length) return;
+    var endX = meta.data[meta.data.length - 1].x;
+    var ctx = chart.ctx;
+    ctx.save();
+    for (var i = 0; i < pts.length; i++) {
+      var x1 = pts[i].x, y1 = pts[i].y, g1 = pts[i].gpa;
+      var x2 = i + 1 < pts.length ? pts[i + 1].x : endX;
+      var y2 = i + 1 < pts.length ? pts[i + 1].y : y1;
+      var g2 = i + 1 < pts.length ? pts[i + 1].gpa : g1;
+      drawJourneyZoneSegment(ctx, x1, y1, x2, y2, yTarget, g1, g2, opts.targetGpa);
+    }
+    ctx.restore();
+  }
+};
+
+function drawJourneyZoneSegment(ctx, x1, y1, x2, y2, yTarget, g1, g2, targetGpa) {
+  var above = 'rgba(34,197,94,0.28)';
+  var below = 'rgba(239,68,68,0.28)';
+  if ((g1 >= targetGpa && g2 >= targetGpa) || (g1 < targetGpa && g2 < targetGpa)) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineTo(x2, yTarget);
+    ctx.lineTo(x1, yTarget);
+    ctx.closePath();
+    ctx.fillStyle = (g1 >= targetGpa && g2 >= targetGpa) ? above : below;
+    ctx.fill();
+    return;
+  }
+  var t = (targetGpa - g1) / (g2 - g1);
+  if (t <= 0 || t >= 1) return;
+  var xi = x1 + (x2 - x1) * t;
+  var yi = yTarget;
+  if (g1 >= targetGpa) {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(xi, yi); ctx.lineTo(x1, yTarget); ctx.closePath();
+    ctx.fillStyle = above; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(xi, yi); ctx.lineTo(x2, y2); ctx.lineTo(x2, yTarget); ctx.lineTo(xi, yi); ctx.closePath();
+    ctx.fillStyle = below; ctx.fill();
+  } else {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(xi, yi); ctx.lineTo(x1, yTarget); ctx.closePath();
+    ctx.fillStyle = below; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(xi, yi); ctx.lineTo(x2, y2); ctx.lineTo(x2, yTarget); ctx.lineTo(xi, yi); ctx.closePath();
+    ctx.fillStyle = above; ctx.fill();
+  }
+}
+
+function buildGpaJourneyMapData(history, goalGpa) {
+  var currentGpa = calcOverallGPA();
+  var hist = (history || []).slice();
+  if (!hist.length && currentGpa > 0) {
+    hist = [{ date: new Date().toISOString().slice(0, 10), gpa: currentGpa }];
+  }
+  var target = goalGpa > 0 ? goalGpa : 3.0;
+  if (!hist.length) {
+    return {
+      labels: ['—'],
+      actualData: [0],
+      predictedData: [null],
+      targetData: [target],
+      target: target,
+      predictedEnd: null,
+      currentGpa: 0
+    };
+  }
+  var firstD = new Date(hist[0].date);
+  var lastD = new Date(hist[hist.length - 1].date);
+  var endD = new Date(firstD);
+  endD.setDate(endD.getDate() + 120);
+  if (endD <= lastD) {
+    endD = new Date(lastD);
+    endD.setDate(endD.getDate() + 45);
+  }
+  var semesterEnd = endD.toISOString().slice(0, 10);
+  var labels = hist.map(function(h) { return h.date.slice(5); });
+  labels.push(semesterEnd.slice(5));
+  var actualData = hist.map(function(h) { return h.gpa; });
+  actualData.push(null);
+  var lastGpa = currentGpa > 0 ? currentGpa : hist[hist.length - 1].gpa;
+  if (actualData.length > 1) actualData[actualData.length - 2] = lastGpa;
+
+  var predictedEnd = calcSemesterEndPredictedGPA();
+  var predictedData = labels.map(function() { return null; });
+  predictedData[hist.length - 1] = lastGpa;
+  predictedData[predictedData.length - 1] = predictedEnd;
+
+  var targetData = labels.map(function() { return target; });
+  return {
+    labels: labels,
+    actualData: actualData,
+    predictedData: predictedData,
+    targetData: targetData,
+    target: target,
+    predictedEnd: predictedEnd,
+    currentGpa: lastGpa
+  };
+}
+
+function ensureGpaJourneyPlugin() {
+  if (gpaJourneyFillPluginRegistered || typeof Chart === 'undefined') return;
+  Chart.register(gpaJourneyFillPlugin);
+  gpaJourneyFillPluginRegistered = true;
+}
+
 function renderProgressRings(items) {
   var el = document.getElementById('progress-rings');
   if (!el) return;
@@ -3827,66 +4057,108 @@ function renderCharts() {
   }
 
   gpaHistory = gpaHistory || [];
-  var trendLabels = gpaHistory.map(function(h) { return h.date.slice(5); });
-  var trendData = gpaHistory.map(function(h) { return h.gpa; });
+  ensureGpaJourneyPlugin();
+  var journey = buildGpaJourneyMapData(gpaHistory, targetGPA);
   var trendCtx = document.getElementById('trend-chart');
   if (trendCtx) {
-    var gradient = trendCtx.getContext('2d').createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(108,99,255,0.4)');
-    gradient.addColorStop(1, 'rgba(108,99,255,0.05)');
-    
+    var journeyDatasets = [
+      {
+        label: 'Target GPA',
+        data: journey.targetData,
+        borderColor: '#fbbf24',
+        borderWidth: 2,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        tension: 0,
+        order: 3
+      },
+      {
+        label: 'Actual GPA',
+        data: journey.actualData,
+        borderColor: '#6c63ff',
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.35,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointBackgroundColor: '#fff',
+        pointBorderColor: '#6c63ff',
+        pointBorderWidth: 2,
+        pointHoverBackgroundColor: '#6c63ff',
+        pointHoverBorderColor: '#fff',
+        borderWidth: 3,
+        spanGaps: false,
+        order: 1
+      },
+      {
+        label: 'Predicted GPA',
+        data: journey.predictedData,
+        borderColor: '#38bdf8',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        pointRadius: journey.predictedData.map(function(v, i) {
+          return (i === journey.predictedData.length - 1 && v !== null) ? 5 : 0;
+        }),
+        pointBackgroundColor: '#38bdf8',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        fill: false,
+        tension: 0.15,
+        spanGaps: true,
+        order: 2
+      }
+    ];
+
     charts.trend = new Chart(trendCtx.getContext('2d'), {
       type: 'line',
       data: {
-        labels: trendLabels.length ? trendLabels : ['—'],
-        datasets: [{
-          label: 'GPA',
-          data: trendData.length ? trendData : [0],
-          borderColor: '#6c63ff',
-          backgroundColor: gradient,
-          fill: true,
-          tension: 0.4,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          pointBackgroundColor: '#fff',
-          pointBorderColor: '#6c63ff',
-          pointBorderWidth: 2,
-          pointHoverBackgroundColor: '#6c63ff',
-          pointHoverBorderColor: '#fff',
-          borderWidth: 3
-        }]
+        labels: journey.labels,
+        datasets: journeyDatasets
       },
       options: {
         responsive: true,
         animation: animOpts,
-        plugins: { 
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          gpaJourneyFill: {
+            targetGpa: journey.target,
+            actualDatasetIndex: 1
+          },
           legend: { display: false },
           tooltip: {
             backgroundColor: 'rgba(0,0,0,0.8)',
             titleColor: '#fff',
             bodyColor: '#fff',
             padding: 12,
-            displayColors: false,
+            filter: function(item) {
+              return item.parsed.y !== null && item.parsed.y !== undefined;
+            },
             callbacks: {
               label: function(context) {
-                return 'GPA: ' + context.parsed.y.toFixed(2);
+                var label = context.dataset.label || '';
+                if (label === 'Predicted GPA' && context.dataIndex === journey.predictedData.length - 1 && journey.predictedEnd !== null) {
+                  return label + ': ' + context.parsed.y.toFixed(2) + ' (semester end — based on course finals)';
+                }
+                return label + ': ' + context.parsed.y.toFixed(2);
               }
             }
           }
         },
         scales: {
-          y: { 
-            min: 0, 
-            max: 4, 
-            ticks: { 
+          y: {
+            min: 0,
+            max: 4,
+            ticks: {
               color: chartTextColor(),
-              stepSize: 0.5
-            }, 
-            grid: { color: 'rgba(255,255,255,0.05)' } 
+              stepSize: 1
+            },
+            grid: { color: 'rgba(255,255,255,0.05)' }
           },
-          x: { 
-            ticks: { color: chartTextColor() }, 
-            grid: { display: false } 
+          x: {
+            ticks: { color: chartTextColor() },
+            grid: { display: false }
           }
         }
       }
