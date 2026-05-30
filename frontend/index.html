@@ -223,6 +223,11 @@ select.input-field{cursor:pointer;}
 .popup-btn-ok.achievement-btn{background:linear-gradient(135deg,var(--green),#22c55e);}
 @keyframes achievementPop{0%{transform:scale(0.92);opacity:0;}60%{transform:scale(1.03);}100%{transform:scale(1);opacity:1;}}
 .popup-box.achievement{animation:achievementPop 0.45s ease;}
+.popup-box.alert{border-color:rgba(239,68,68,0.5);box-shadow:0 0 48px rgba(239,68,68,0.2);}
+.popup-box.alert .popup-title{color:var(--red);}
+.popup-btn-ok.alert-btn{background:linear-gradient(135deg,var(--red),#dc2626);}
+@keyframes alertShake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-4px);}40%,80%{transform:translateX(4px);}}
+.popup-box.alert{animation:alertShake 0.5s ease;}
 /* TOAST */
 .toast-container{position:fixed;bottom:80px;right:16px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
 .toast{padding:12px 18px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;max-width:280px;opacity:0;transform:translateX(20px);transition:all 0.3s ease;pointer-events:auto;}
@@ -1963,6 +1968,7 @@ function clearAchievementPopupStyle() {
   var okBtn = document.getElementById('popup-ok');
   if (box) box.classList.remove('achievement');
   if (okBtn) okBtn.classList.remove('achievement-btn');
+  clearAlertPopupStyle();
 }
 
 function getPrevGpaKey() {
@@ -2024,6 +2030,108 @@ function checkTargetAchievement() {
       showAchievementPopup(
         'Subject Target Hit!',
         label + ' reached your target GPA of ' + targetGPA.toFixed(2) + '! Keep pushing your semester GPA.'
+      );
+    }
+  }
+}
+
+// ============================================================
+// LOW PERFORMANCE ALERT (Part 9)
+// ============================================================
+var _buzzerSoundPlayed = false;
+var LOW_GPA_THRESHOLD = 2.0;
+var LOW_GPA_DROP_ALERT = 0.4;
+
+function playBuzzerSound() {
+  if (_buzzerSoundPlayed) return;
+  _buzzerSoundPlayed = true;
+  try {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    var ctx = new Ctx();
+    [0, 0.35].forEach(function(offset) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 180;
+      var t = ctx.currentTime + offset;
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.exponentialRampToValueAtTime(0.12, t + 0.02);
+      gain.gain.setValueAtTime(0.12, t + 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.3);
+    });
+    setTimeout(function() { try { ctx.close(); } catch(e) {} }, 900);
+  } catch (e) { /* audio blocked */ }
+}
+
+function showLowPerformanceAlert(title, msg) {
+  var box = document.querySelector('#popup-overlay .popup-box');
+  var okBtn = document.getElementById('popup-ok');
+  if (box) {
+    box.classList.remove('achievement');
+    box.classList.add('alert');
+  }
+  if (okBtn) {
+    okBtn.classList.remove('achievement-btn');
+    okBtn.classList.add('alert-btn');
+  }
+  playBuzzerSound();
+  showPopup('🚨', title, msg);
+}
+
+function clearAlertPopupStyle() {
+  var box = document.querySelector('#popup-overlay .popup-box');
+  var okBtn = document.getElementById('popup-ok');
+  if (box) box.classList.remove('alert');
+  if (okBtn) okBtn.classList.remove('alert-btn');
+}
+
+function checkLowPerformanceAlert() {
+  if (!currentUser) return;
+  _buzzerSoundPlayed = false;
+
+  var gpa = calcOverallGPA();
+  if (gpa <= 0) return;
+
+  var prevKey = getPrevGpaKey();
+  var prevGpa = prevKey ? safeFloat(localStorage.getItem(prevKey), gpa) : gpa;
+  var alerted = false;
+
+  if (prevGpa >= LOW_GPA_THRESHOLD && gpa < LOW_GPA_THRESHOLD) {
+    showLowPerformanceAlert(
+      'Low Performance Alert',
+      'Your semester GPA dropped to ' + gpa.toFixed(2) + ' (below ' + LOW_GPA_THRESHOLD.toFixed(1) + '). Review at-risk subjects in Analytics and prioritize study time.'
+    );
+    alerted = true;
+  } else if (prevGpa - gpa >= LOW_GPA_DROP_ALERT && gpa > 0) {
+    showLowPerformanceAlert(
+      'GPA Drop Detected',
+      'Your semester GPA fell from ' + prevGpa.toFixed(2) + ' to ' + gpa.toFixed(2) + '. Check the Risk Analyzer and adjust your study plan before finals.'
+    );
+    alerted = true;
+  }
+
+  if (!alerted) {
+    var subjectDrops = [];
+    (subjects || []).forEach(function(s) {
+      if (!s) return;
+      var sg = getSubjectGpa(s);
+      if (sg === null) return;
+      var sk = getPrevSubGpaKey(s.id);
+      var prevSub = sk ? safeFloat(localStorage.getItem(sk), sg) : sg;
+      if (prevSub >= LOW_GPA_THRESHOLD && sg < LOW_GPA_THRESHOLD) {
+        subjectDrops.push(s.name + ' (' + sg.toFixed(2) + ')');
+      }
+    });
+    if (subjectDrops.length) {
+      var label = subjectDrops.slice(0, 3).join(', ') + (subjectDrops.length > 3 ? ' +' + (subjectDrops.length - 3) + ' more' : '');
+      showLowPerformanceAlert(
+        'Subject At Risk',
+        label + ' dropped below GPA ' + LOW_GPA_THRESHOLD.toFixed(1) + '. Focus on these subjects immediately.'
       );
     }
   }
@@ -2137,6 +2245,7 @@ function saveData() {
     localStorage.setItem('ga_target_' + currentUser.email, String(targetGPA));
     recordGpaSnapshot();
     recordStudyActivity();
+    checkLowPerformanceAlert();
     checkTargetAchievement();
   }
   if (document.getElementById('panel-analytics') && document.getElementById('panel-analytics').classList.contains('active')) {
