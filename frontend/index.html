@@ -206,6 +206,11 @@ select.input-field{cursor:pointer;}
 .tt-card.priority-critical{border-color:rgba(239,68,68,0.35);}
 .tt-card.priority-high{border-color:rgba(245,158,11,0.35);}
 .tt-card.priority-medium{border-color:rgba(234,179,8,0.25);}
+.ai-timetable-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);}
+.ai-timetable-bar p{margin:0;font-size:12px;color:var(--text2);flex:1;min-width:200px;line-height:1.5;}
+.ai-timetable-bar .btn{white-space:nowrap;}
+.tt-card.ai-generated{border-style:dashed;}
+.tt-card-ai-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--primary2);margin-bottom:4px;}
 /* POPUP */
 .popup-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:600;align-items:center;justify-content:center;padding:20px;}
 .popup-overlay.active{display:flex;}
@@ -1039,6 +1044,10 @@ select.input-field{cursor:pointer;}
             <input type="checkbox" id="ai-study-mode"> 🤖 AI Study Priority Mode
           </label>
         </div>
+        <div class="ai-timetable-bar">
+          <p>AI Timetable Mode builds a weekly study schedule from your subjects — at-risk courses get more hours and earlier slots.</p>
+          <button class="btn btn-primary btn-sm" id="ai-generate-tt-btn" type="button">🤖 AI Generate Schedule</button>
+        </div>
         <div id="study-priority-panel" class="study-priority-panel" style="display:none;">
           <h3>📊 Study Priority Ranking</h3>
           <p class="study-priority-sub">Subjects ranked by GPA risk, target gap, final urgency, and chapter progress.</p>
@@ -1673,6 +1682,122 @@ function renderStudyPriorityPanel() {
       '<span class="priority-badge ' + e.tier.class + '">' + e.tier.icon + ' ' + e.tier.label + ' (' + e.score + ')</span>' +
     '</div>';
   }).join('');
+}
+
+var AI_STUDY_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+var AI_STUDY_SLOTS = [
+  { start: '09:00', end: '10:00' },
+  { start: '10:30', end: '11:30' },
+  { start: '14:00', end: '15:00' },
+  { start: '15:30', end: '16:30' },
+  { start: '17:00', end: '18:00' },
+  { start: '19:00', end: '20:00' },
+  { start: '20:30', end: '21:30' }
+];
+
+function getStudyBlocksForSubject(s) {
+  var score = calcStudyPriorityScore(s);
+  if (score >= 75) return 3;
+  if (score >= 55) return 2;
+  return 1;
+}
+
+function slotConflicts(existing, day, start, end) {
+  var newStart = timeToMinutes(start);
+  var newEnd = timeToMinutes(end);
+  return existing.some(function(t) {
+    if (!t || t.day !== day) return false;
+    return newStart < timeToMinutes(t.end) && newEnd > timeToMinutes(t.start);
+  });
+}
+
+function findNextFreeTimetableSlot(existing, dayCursor) {
+  for (var d = 0; d < AI_STUDY_DAYS.length; d++) {
+    var day = AI_STUDY_DAYS[(dayCursor + d) % AI_STUDY_DAYS.length];
+    for (var i = 0; i < AI_STUDY_SLOTS.length; i++) {
+      var slot = AI_STUDY_SLOTS[i];
+      if (!slotConflicts(existing, day, slot.start, slot.end)) {
+        return { day: day, start: slot.start, end: slot.end, nextCursor: (dayCursor + d + 1) % AI_STUDY_DAYS.length };
+      }
+    }
+  }
+  return null;
+}
+
+function buildAITimetable() {
+  subjects = subjects || [];
+  var ranked = subjects.filter(function(s) { return s && s.name; }).slice();
+  if (!ranked.length) return [];
+  ranked.sort(function(a, b) { return calcStudyPriorityScore(b) - calcStudyPriorityScore(a); });
+
+  var built = [];
+  var dayCursor = 0;
+  ranked.forEach(function(s) {
+    var blocks = getStudyBlocksForSubject(s);
+    for (var b = 0; b < blocks; b++) {
+      var slot = findNextFreeTimetableSlot(built, dayCursor);
+      if (!slot) break;
+      built.push({
+        id: generateId(),
+        subject: s.name,
+        day: slot.day,
+        start: slot.start,
+        end: slot.end,
+        aiGenerated: true
+      });
+      dayCursor = slot.nextCursor;
+    }
+  });
+  return built;
+}
+
+function summarizeAITimetable(slots) {
+  if (!slots.length) return 'No study slots could be scheduled.';
+  var bySubject = {};
+  slots.forEach(function(t) {
+    bySubject[t.subject] = (bySubject[t.subject] || 0) + 1;
+  });
+  var lines = Object.keys(bySubject).slice(0, 4).map(function(name) {
+    return name + ': ' + bySubject[name] + ' session' + (bySubject[name] > 1 ? 's' : '');
+  });
+  var extra = Object.keys(bySubject).length - 4;
+  if (extra > 0) lines.push('+' + extra + ' more subject' + (extra > 1 ? 's' : ''));
+  return lines.join(' • ');
+}
+
+function applyAITimetable() {
+  var generated = buildAITimetable();
+  if (!generated.length) {
+    showPopup('⚠️', 'Nothing to Schedule', 'Add subjects in the Subjects tab first, then try again.');
+    return;
+  }
+  timetable = generated;
+  aiStudyMode = true;
+  if (currentUser) localStorage.setItem('ga_ai_study_' + currentUser.email, '1');
+  saveData();
+  renderTimetable();
+  renderOverview();
+  showToast('AI generated ' + generated.length + ' study session' + (generated.length > 1 ? 's' : '') + '! 🤖', 'success');
+}
+
+function runAIGenerateTimetable() {
+  if (!subjects || !subjects.length) {
+    showPopup('⚠️', 'No Subjects', 'Add subjects in the Subjects tab first so AI can build your study schedule.');
+    return;
+  }
+  var preview = buildAITimetable();
+  if (!preview.length) {
+    showPopup('⚠️', 'Schedule Full', 'Could not fit any study blocks. Remove some manual classes or try again with fewer subjects.');
+    return;
+  }
+  var summary = summarizeAITimetable(preview);
+  var msg = 'AI will create ' + preview.length + ' weekly study block' + (preview.length > 1 ? 's' : '') + ' for ' + subjects.length + ' subject' + (subjects.length > 1 ? 's' : '') + '.\n\n' + summary + '\n\nHigher-priority subjects get more sessions.';
+  if (timetable && timetable.length) {
+    msg += '\n\nThis replaces your ' + timetable.length + ' existing class' + (timetable.length > 1 ? 'es' : '') + '.';
+    showPopup('🤖', 'AI Generate Schedule', msg, applyAITimetable);
+  } else {
+    applyAITimetable();
+  }
 }
 
 function analyzeSubjectRisk(s) {
@@ -2786,6 +2911,7 @@ function renderTimetable() {
     var matchedSubject = findSubjectForTimetable(t.subject);
     var priorityHtml = '';
     var cardClass = 'tt-card';
+    if (t.aiGenerated) cardClass += ' ai-generated';
     if (aiStudyMode) {
       var score = calcStudyPriorityScore(matchedSubject);
       var tier = getPriorityTier(score);
@@ -2795,10 +2921,12 @@ function renderTimetable() {
         '<div class="tt-card-ai-tip">💡 Focus: ' + escapeHtml(reasons[0] || 'Review this subject') + '</div>';
     }
 
+    var aiTag = t.aiGenerated ? '<div class="tt-card-ai-tag">🤖 AI scheduled</div>' : '';
     var card = document.createElement('div');
     card.className = cardClass;
     card.innerHTML =
       '<div class="tt-card-day">' + t.day + '</div>' +
+      aiTag +
       priorityHtml +
       '<div class="tt-card-subject">' + escapeHtml(t.subject) + '</div>' +
       '<div class="tt-card-time">⏰ ' + t.start + ' – ' + t.end + '</div>' +
@@ -2879,6 +3007,11 @@ if (aiStudyToggle) {
     renderTimetable();
     showToast(aiStudyMode ? 'AI Study Priority Mode enabled 🤖' : 'AI Study Priority Mode disabled', 'info');
   });
+}
+
+var aiGenerateBtn = document.getElementById('ai-generate-tt-btn');
+if (aiGenerateBtn) {
+  aiGenerateBtn.addEventListener('click', runAIGenerateTimetable);
 }
 
 document.getElementById('cancel-tt-edit-btn').addEventListener('click', cancelEditTT);
