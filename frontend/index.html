@@ -2402,17 +2402,75 @@ function getExamKey() {
   return currentUser ? 'ga_exam_' + currentUser.email : null;
 }
 
+function getDaysUntilExam(dateVal) {
+  var exam = new Date(dateVal + 'T00:00:00');
+  var now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.ceil((exam - now) / 86400000);
+}
+
 function getExamCountdownInfo() {
   if (!currentUser) return null;
   var raw = localStorage.getItem(getExamKey());
   if (!raw) return null;
   var data = parseJSON(raw, null);
   if (!data || typeof data !== 'object' || !data.date) return null;
-  var exam = new Date(data.date + 'T00:00:00');
-  var now = new Date();
-  now.setHours(0, 0, 0, 0);
-  var days = Math.ceil((exam - now) / 86400000);
+  var days = getDaysUntilExam(data.date);
   return { name: data.name || 'Exam', days: days, date: data.date };
+}
+
+function getExamReminderShownKey(examDate) {
+  return currentUser ? 'ga_exam_7d_reminder_' + currentUser.email + '_' + examDate : null;
+}
+
+function checkExamCountdownReminder() {
+  if (!currentUser) return;
+  var exam = getExamCountdownInfo();
+  if (!exam || exam.days !== 7) return;
+  var shownKey = getExamReminderShownKey(exam.date);
+  if (!shownKey || localStorage.getItem(shownKey) === '1') return;
+  localStorage.setItem(shownKey, '1');
+  showPopup('📅', 'Exam Reminder', exam.name + ' in 7 days! Check your Target GPA Predictor!');
+  showToast(exam.name + ' in 7 days! Check your Target GPA Predictor!', 'warning');
+}
+
+function startExamCountdown(name, dateVal) {
+  if (countdownTimer) clearInterval(countdownTimer);
+  var display = document.getElementById('countdown-display');
+  if (!display) return;
+
+  function tick() {
+    var target = new Date(dateVal + 'T00:00:00');
+    var now = new Date();
+    var diff = target - now;
+    if (diff <= 0) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      display.textContent = name + ' is today! 🎓';
+      return;
+    }
+    var d = getDaysUntilExam(dateVal);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var s = Math.floor((diff % 60000) / 1000);
+    display.textContent = name + ': ' + d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
+    if (d === 7) checkExamCountdownReminder();
+  }
+
+  tick();
+  checkExamCountdownReminder();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+function restoreExamCountdown() {
+  if (!currentUser) return;
+  var info = getExamCountdownInfo();
+  if (!info) return;
+  var nameEl = document.getElementById('exam-name');
+  var dateEl = document.getElementById('exam-date');
+  if (nameEl) nameEl.value = info.name;
+  if (dateEl) dateEl.value = info.date;
+  if (info.days >= 0) startExamCountdown(info.name, info.date);
 }
 
 function buildPanicChecklist(report, priorities) {
@@ -3040,6 +3098,7 @@ function loadUserData() {
   if (gpaHistory.length === 0 && calcOverallGPA() > 0) recordGpaSnapshot();
   initAchievementTracking();
   try { checkGamification(true); } catch (e) { console.error('Gamification sync failed:', e); }
+  restoreExamCountdown();
 }
 
 function recordGpaSnapshot() {
@@ -4159,28 +4218,18 @@ document.getElementById('countdown-btn').addEventListener('click', function() {
   var name = document.getElementById('exam-name').value.trim() || 'Exam';
   var dateVal = document.getElementById('exam-date').value;
   if (!dateVal) { showPopup('⚠️', 'No Date', 'Please select an exam date.'); return; }
-  if (countdownTimer) clearInterval(countdownTimer);
-  var display = document.getElementById('countdown-display');
-  display.textContent = 'Starting...';
-  countdownTimer = setInterval(function() {
-    var target = new Date(dateVal + 'T00:00:00');
-    var now = new Date();
-    var diff = target - now;
-    if (diff <= 0) {
-      clearInterval(countdownTimer);
-      display.textContent = name + ' is today! 🎓';
-      return;
-    }
-    var d = Math.floor(diff / 86400000);
-    var h = Math.floor((diff % 86400000) / 3600000);
-    var m = Math.floor((diff % 3600000) / 60000);
-    var s = Math.floor((diff % 60000) / 1000);
-    display.textContent = name + ': ' + d + 'd ' + h + 'h ' + m + 'm ' + s + 's';
-  }, 1000);
-  showToast('Countdown started for ' + name + '!', 'success');
   if (currentUser) {
+    var prevRaw = localStorage.getItem(getExamKey());
+    var prevData = parseJSON(prevRaw, null);
     localStorage.setItem(getExamKey(), JSON.stringify({ name: name, date: dateVal }));
+    if (!prevData || prevData.date !== dateVal) {
+      Object.keys(localStorage).forEach(function(k) {
+        if (k.indexOf('ga_exam_7d_reminder_' + currentUser.email) === 0) localStorage.removeItem(k);
+      });
+    }
   }
+  startExamCountdown(name, dateVal);
+  showToast('Countdown started for ' + name + '!', 'success');
 });
 
 // ============================================================
